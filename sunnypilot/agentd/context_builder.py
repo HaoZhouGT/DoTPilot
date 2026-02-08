@@ -19,6 +19,7 @@ class ContextBuilder:
       "leads": self._build_leads(sm),
       "model": self._build_model(sm),
       "map": self._build_map(sm),
+      "gps": self._build_gps(sm),
       "system": self._build_system(sm),
       "frame_jpeg_b64": base64.b64encode(frame_jpeg).decode() if frame_jpeg else None,
     }
@@ -78,6 +79,22 @@ class ContextBuilder:
       result["speed_limit_ahead_mph"] = round(map_data.speedLimitAhead * KPH_TO_MPH, 0)
       result["speed_limit_ahead_distance_m"] = round(map_data.speedLimitAheadDistance, 0)
 
+    return result
+
+  def _build_gps(self, sm: messaging.SubMaster) -> dict:
+    gps = sm['gpsLocation']
+    result = {}
+    # gpsLocation has latitude, longitude, altitude, speed, bearing, accuracy
+    if gps.hasFix:
+      result["latitude"] = round(gps.latitude, 6)
+      result["longitude"] = round(gps.longitude, 6)
+      result["altitude_m"] = round(gps.altitude, 1)
+      result["bearing_deg"] = round(gps.bearingDeg, 1)
+      result["speed_mph"] = round(gps.speed * MS_TO_MPH, 1)
+      result["accuracy_m"] = round(gps.accuracy, 1)
+      result["has_fix"] = True
+    else:
+      result["has_fix"] = False
     return result
 
   def _build_system(self, sm: messaging.SubMaster) -> dict:

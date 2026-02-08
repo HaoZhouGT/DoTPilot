@@ -128,6 +128,14 @@ class CloudBackend(BaseLLMBackend):
     else:
       lines.append("\nNo vehicles detected ahead by radar.")
 
+    gps = context.get("gps", {})
+    if gps.get("has_fix"):
+      lines.append(f"\nGPS: {gps['latitude']:.6f}, {gps['longitude']:.6f} "
+                   f"(bearing {gps.get('bearing_deg', 0):.0f}°, "
+                   f"accuracy {gps.get('accuracy_m', 0):.0f}m)")
+    else:
+      lines.append("\nGPS: no fix")
+
     m = context.get("map", {})
     if m.get("road_name"):
       lines.append(f"\nRoad: {m['road_name']}")
