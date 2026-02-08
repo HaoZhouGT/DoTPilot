@@ -289,6 +289,7 @@ struct LongitudinalPlanSP @0xf35cc4560bbf6ec2 {
     sccVision @1;
     sccMap @2;
     speedLimitAssist @3;
+    agentAdvisory @4;
   }
 
   struct E2eAlerts {
@@ -341,6 +342,9 @@ struct OnroadEventSP @0xda96579883444c35 {
     speedLimitChanged @21;
     speedLimitPending @22;
     e2eChime @23;
+    agentSpeedAdvisory @24;
+    agentLaneAdvisory @25;
+    agentAlert @26;
   }
 }
 
@@ -455,10 +459,68 @@ struct ModelDataV2SP @0xa1680744031fdb2d {
   }
 }
 
-struct CustomReserved10 @0xcb9fd56c7057593a {
+struct AgentStateSP @0xcb9fd56c7057593a {
+  state @0 :AgentState;
+  backend @1 :Backend;
+  inferenceLatencyMs @2 :Float32;
+  lastReasoningTimestamp @3 :UInt64;
+  sceneSummary @4 :Text;
+  confidence @5 :Float32;
+
+  enum AgentState {
+    disabled @0;
+    initializing @1;
+    active @2;
+    degraded @3;
+    error @4;
+  }
+
+  enum Backend {
+    cloud @0;
+    onDevice @1;
+    none @2;
+  }
 }
 
-struct CustomReserved11 @0xc2243c65e0340384 {
+struct AgentAdvisorySP @0xc2243c65e0340384 {
+  speedAdvisory @0 :SpeedAdvisory;
+  laneAdvisory @1 :LaneAdvisory;
+  alertAdvisory @2 :AlertAdvisory;
+  activeToolName @3 :Text;
+  advisoryReason @4 :Text;
+
+  struct SpeedAdvisory {
+    active @0 :Bool;
+    speedLimitMs @1 :Float32;
+    source @2 :Text;
+    confidence @3 :Float32;
+    distanceAheadM @4 :Float32;
+  }
+
+  struct LaneAdvisory {
+    active @0 :Bool;
+    suggestedDirection @1 :LaneDirection;
+    reason @2 :Text;
+    confidence @3 :Float32;
+
+    enum LaneDirection {
+      none @0;
+      left @1;
+      right @2;
+    }
+  }
+
+  struct AlertAdvisory {
+    active @0 :Bool;
+    text @1 :Text;
+    severity @2 :Severity;
+
+    enum Severity {
+      info @0;
+      warning @1;
+      critical @2;
+    }
+  }
 }
 
 struct CustomReserved12 @0x9ccdc8676701b412 {

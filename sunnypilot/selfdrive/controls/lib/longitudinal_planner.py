@@ -69,6 +69,12 @@ class LongitudinalPlannerSP:
       LongitudinalPlanSource.speedLimitAssist: (self.sla.output_v_target, self.sla.output_a_target),
     }
 
+    # AI Agent advisory speed target
+    agent_advisory = sm['agentAdvisorySP']
+    if agent_advisory.speedAdvisory.active and agent_advisory.speedAdvisory.confidence > 0.5:
+      agent_v = float(agent_advisory.speedAdvisory.speedLimitMs)
+      targets[LongitudinalPlanSource.agentAdvisory] = (agent_v, a_ego)
+
     self.source = min(targets, key=lambda k: targets[k][0])
     self.output_v_target, self.output_a_target = targets[self.source]
     return self.output_v_target, self.output_a_target

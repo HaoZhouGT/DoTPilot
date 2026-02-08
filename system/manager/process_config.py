@@ -92,6 +92,9 @@ def is_stock_model(started, params, CP: car.CarParams) -> bool:
   """Check if the active model runner is stock."""
   return bool(get_active_model_runner(params, not started) == custom.ModelManagerSP.Runner.stock)
 
+def agent_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
+  return started and params.get_bool("AgentEnabled")
+
 def mapd_ready(started: bool, params: Params, CP: car.CarParams) -> bool:
   return bool(os.path.exists(Paths.mapd_root()))
 
@@ -182,6 +185,9 @@ procs += [
 
   # locationd
   NativeProcess("locationd_llk", "sunnypilot/selfdrive/locationd", ["./locationd"], only_onroad),
+
+  # DoTPilot AI Agent
+  PythonProcess("agentd", "sunnypilot.agentd.agentd", and_(only_onroad, agent_enabled)),
 ]
 
 if os.path.exists("./github_runner.sh"):
