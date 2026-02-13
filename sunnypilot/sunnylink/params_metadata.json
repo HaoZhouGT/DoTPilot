@@ -27,6 +27,10 @@
     "title": "Firehose Mode Stats",
     "description": ""
   },
+  "AgentApiKey": {
+    "title": "LLM Agent API Key",
+    "description": ""
+  },
   "AssistNowToken": {
     "title": "Assist Now Token",
     "description": ""
