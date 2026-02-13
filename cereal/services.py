@@ -102,6 +102,10 @@ _services: dict[str, tuple] = {
   "modelDataV2SP": (True, 20., None, QueueSize.BIG),
   "liveLocationKalman": (True, 20.),
 
+  # DoTPilot AI Agent
+  "agentStateSP": (True, 1., 1),
+  "agentAdvisorySP": (True, 2., 2),
+
   # debug
   "uiDebug": (True, 0., 1),
   "testJoystick": (True, 0.),

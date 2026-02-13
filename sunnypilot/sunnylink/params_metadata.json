@@ -3,6 +3,14 @@
     "title": "AccessTokenIsNice",
     "description": ""
   },
+  "AgentApiKey": {
+    "title": "DoTPilot AI API Key",
+    "description": ""
+  },
+  "AgentEnabled": {
+    "title": "Enable DoTPilot AI Agent",
+    "description": ""
+  },
   "AdbEnabled": {
     "title": "Enable ADB",
     "description": ""
@@ -90,12 +98,8 @@
     "description": ""
   },
   "BlindSpot": {
-    "title": "[TIZI/TICI only] Blind Spot Detection",
-    "description": "Enabling this will display warnings when a vehicle is detected in your blind spot as long as your car has BSM supported."
-  },
-  "BlinkerLateralReengageDelay": {
-    "title": "Post-Blinker Delay",
-    "description": "Delay before lateral control resumes after the turn signal ends."
+    "title": "Blind Spot Detection",
+    "description": ""
   },
   "BlinkerMinLateralControlSpeed": {
     "title": "Blinker Min Lateral Control Speed",
@@ -286,6 +290,10 @@
     "title": "GitHub Runner Service",
     "description": ""
   },
+  "FL511ApiKey": {
+    "title": "FL511 API Key",
+    "description": ""
+  },
   "EnableSunnylinkUploader": {
     "title": "Enable sunnylink Uploader",
     "description": ""
@@ -343,8 +351,8 @@
     "description": ""
   },
   "GreenLightAlert": {
-    "title": "Green Traffic Light Alert (Beta)",
-    "description": "A chime and on-screen alert (TIZI/TICI only) will play when the traffic light you are waiting for turns green and you have no vehicle in front of you. <br>Note: This chime is only designed as a notification. It is the driver's responsibility to observe their environment and make decisions accordingly."
+    "title": "Green Light Alert",
+    "description": ""
   },
   "GsmApn": {
     "title": "GSM APN",
@@ -371,8 +379,8 @@
     "description": ""
   },
   "HideVEgoUI": {
-    "title": "[TIZI/TICI only] Speedometer: Hide from Onroad Screen",
-    "description": "When enabled, the speedometer on the onroad screen is not displayed."
+    "title": "Hide vEgo UI",
+    "description": ""
   },
   "HyundaiLongitudinalTuning": {
     "title": "Hyundai Longitudinal Tuning",
@@ -589,8 +597,8 @@
     "description": ""
   },
   "LeadDepartAlert": {
-    "title": "Lead Departure Alert (Beta)",
-    "description": "A chime and on-screen alert (TIZI/TICI only) will play when you are stopped, and the vehicle in front of you start moving. <br>Note: This chime is only designed as a notification. It is the driver's responsibility to observe their environment and make decisions accordingly."
+    "title": "Lead Depart Alert",
+    "description": ""
   },
   "LiveDelay": {
     "title": "Live Delay",
@@ -1078,17 +1086,21 @@
     "title": "Record Front Lock",
     "description": ""
   },
+  "RoadMaintenanceReports": {
+    "title": "Road Maintenance Reports",
+    "description": ""
+  },
   "RoadName": {
     "title": "Road Name",
     "description": ""
   },
   "RoadNameToggle": {
-    "title": "[TIZI/TICI only] Display Road Name",
-    "description": "Displays the name of the road the car is traveling on. <br>The OpenStreetMap database of the location must be downloaded to fetch the road name."
+    "title": "Display Road Name",
+    "description": ""
   },
   "RocketFuel": {
-    "title": "[TIZI/TICI only] Real-time Acceleration Bar",
-    "description": "Show an indicator on the left side of the screen to display real-time vehicle acceleration and deceleration. This displays what the car is currently doing, not what the planner is requesting."
+    "title": "Display Rocket Fuel Bar",
+    "description": "Show an indicator on the left side of the screen to display real-time vehicle acceleration and deceleration."
   },
   "RouteCount": {
     "title": "Route Count",
@@ -1107,8 +1119,8 @@
     "description": ""
   },
   "ShowTurnSignals": {
-    "title": "[TIZI/TICI only] Display Turn Signals",
-    "description": "When enabled, visual turn indicators are drawn on the HUD."
+    "title": "Show Turn Signals",
+    "description": ""
   },
   "SmartCruiseControlMap": {
     "title": "Smart Cruise Control - Map",
@@ -1200,8 +1212,8 @@
     "description": ""
   },
   "StandstillTimer": {
-    "title": "[TIZI/TICI only] Standstill Timer",
-    "description": "Show a timer on the HUD when the car is at a standstill."
+    "title": "Standstill Timer",
+    "description": ""
   },
   "SubaruStopAndGo": {
     "title": "Subaru Stop and Go",
@@ -1243,10 +1255,6 @@
     "title": "Tesla Coop Steering",
     "description": ""
   },
-  "TorqueBar": {
-    "title": "[TIZI/TICI only] Steering Arc",
-    "description": "Display steering arc on the driving screen when lateral control is enabled."
-  },
   "TorqueParamsOverrideEnabled": {
     "title": "Manual Real-Time Tuning",
     "description": ""
@@ -1275,8 +1283,8 @@
     "description": ""
   },
   "TrueVEgoUI": {
-    "title": "[TIZI/TICI only] Speedometer: Always Display True Speed",
-    "description": "For applicable vehicles, always display the true vehicle current speed from wheel speed sensors."
+    "title": "True vEgo UI",
+    "description": ""
   },
   "UbloxAvailable": {
     "title": "Ublox Available",

@@ -115,7 +115,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"SnoozeUpdate", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},
     {"SshEnabled", {PERSISTENT | BACKUP, BOOL}},
     {"TermsVersion", {PERSISTENT, STRING}},
-    {"TorqueBar", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"TrainingVersion", {PERSISTENT, STRING}},
     {"UbloxAvailable", {PERSISTENT, BOOL}},
     {"UpdateAvailable", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION, BOOL}},
@@ -137,7 +136,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"ApiCache_DriveStats", {PERSISTENT, JSON}},
     {"AutoLaneChangeBsmDelay", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"AutoLaneChangeTimer", {PERSISTENT | BACKUP, INT, "0"}},
-    {"BlinkerLateralReengageDelay", {PERSISTENT | BACKUP, INT, "0"}},  // seconds
     {"BlinkerMinLateralControlSpeed", {PERSISTENT | BACKUP, INT, "20"}},  // MPH or km/h
     {"BlinkerPauseLateralControl", {PERSISTENT | BACKUP, INT, "0"}},
     {"Brightness", {PERSISTENT | BACKUP, INT, "0"}},
@@ -155,6 +153,10 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"DevUIInfo", {PERSISTENT | BACKUP, INT, "0"}},
     {"EnableCopyparty", {PERSISTENT | BACKUP, BOOL}},
     {"EnableGithubRunner", {PERSISTENT | BACKUP, BOOL}},
+    {"AgentEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"AgentApiKey", {PERSISTENT | BACKUP | DONT_LOG, STRING}},
+    {"FL511ApiKey", {PERSISTENT | BACKUP | DONT_LOG, STRING}},
+    {"RoadMaintenanceReports", {PERSISTENT, JSON}},
     {"GreenLightAlert", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"GithubRunnerSufficientVoltage", {CLEAR_ON_MANAGER_START , BOOL}},
     {"HasAcceptedTermsSP", {PERSISTENT, STRING, "0"}},
@@ -250,7 +252,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"OsmStateTitle", {PERSISTENT, STRING}},
     {"OsmWayTest", {PERSISTENT, STRING}},
     {"RoadName", {CLEAR_ON_ONROAD_TRANSITION, STRING}},
-    {"RoadNameToggle", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"RoadNameToggle", {PERSISTENT, STRING}},
 
     // Speed Limit
     {"SpeedLimitMode", {PERSISTENT | BACKUP, INT, "1"}},
