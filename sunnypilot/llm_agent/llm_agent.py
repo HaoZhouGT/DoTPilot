@@ -19,6 +19,8 @@ OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL = "gpt-4o-mini"
 OPENAI_TIMEOUT_S = 15
 OPENAI_PING_INTERVAL_S = 10
+JPEG_MAX_SIZE = (640, 360)
+JPEG_QUALITY = 55
 
 
 def _get_route_iface() -> str:
@@ -43,7 +45,7 @@ def _read_api_key(params: Params) -> str:
   return os.getenv("OPENAI_API_KEY", "").strip()
 
 
-def _capture_front_camera_jpeg_b64() -> str | None:
+def _capture_front_camera_jpeg_b64() -> tuple[str, int] | None:
   stream = VisionStreamType.VISION_STREAM_ROAD
   available = VisionIpcClient.available_streams("camerad", block=False)
   if stream not in available:
@@ -64,11 +66,12 @@ def _capture_front_camera_jpeg_b64() -> str | None:
       if buf is not None:
         rgb = extract_image(buf)
         img = Image.fromarray(rgb)
-        img.thumbnail((960, 540))
+        img.thumbnail(JPEG_MAX_SIZE)
 
         with io.BytesIO() as out:
-          img.save(out, format="JPEG", quality=70, optimize=True)
-          return base64.b64encode(out.getvalue()).decode("utf-8")
+          img.save(out, format="JPEG", quality=JPEG_QUALITY, optimize=True)
+          jpeg_bytes = out.getvalue()
+          return base64.b64encode(jpeg_bytes).decode("utf-8"), len(jpeg_bytes)
 
     time.sleep(0.05)
 
@@ -140,10 +143,12 @@ def main():
           network_type = sm['deviceState'].networkType
           route_iface = _get_route_iface()
           cloudlog.info(f"llm-agent: vision attempt (networkType={network_type}, routeIface={route_iface})")
-          image_b64 = _capture_front_camera_jpeg_b64()
-          if not image_b64:
+          image_payload = _capture_front_camera_jpeg_b64()
+          if not image_payload:
             cloudlog.warning("llm-agent: no front camera frame available from camerad")
           else:
+            image_b64, image_size = image_payload
+            cloudlog.info(f"llm-agent: encoded frame size={image_size}B")
             ok, detail = _openai_vision_describe(api_key, image_b64)
             if ok:
               cloudlog.info(f"llm-agent: road summary: {detail}")
