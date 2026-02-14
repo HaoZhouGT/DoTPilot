@@ -4,6 +4,7 @@ import io
 import os
 import subprocess
 import time
+from datetime import datetime
 
 import requests
 from PIL import Image
@@ -21,6 +22,17 @@ OPENAI_TIMEOUT_S = 15
 OPENAI_PING_INTERVAL_S = 10
 JPEG_MAX_SIZE = (640, 360)
 JPEG_QUALITY = 55
+LOCAL_LOG_PATH = "/data/llm-agent-test/llm_agent_runtime.log"
+
+
+def _log_local(message: str) -> None:
+  try:
+    os.makedirs(os.path.dirname(LOCAL_LOG_PATH), exist_ok=True)
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOCAL_LOG_PATH, "a", encoding="utf-8") as f:
+      f.write(f"{ts} {message}\n")
+  except Exception:
+    pass
 
 
 def _get_route_iface() -> str:
@@ -143,19 +155,25 @@ def main():
           network_type = sm['deviceState'].networkType
           route_iface = _get_route_iface()
           cloudlog.info(f"llm-agent: vision attempt (networkType={network_type}, routeIface={route_iface})")
+          _log_local(f"vision attempt networkType={network_type} routeIface={route_iface}")
           image_payload = _capture_front_camera_jpeg_b64()
           if not image_payload:
             cloudlog.warning("llm-agent: no front camera frame available from camerad")
+            _log_local("no front camera frame available from camerad")
           else:
             image_b64, image_size = image_payload
             cloudlog.info(f"llm-agent: encoded frame size={image_size}B")
+            _log_local(f"encoded frame size={image_size}B")
             ok, detail = _openai_vision_describe(api_key, image_b64)
             if ok:
               cloudlog.info(f"llm-agent: road summary: {detail}")
+              _log_local(f"road summary: {detail}")
             else:
               cloudlog.warning(f"llm-agent: OpenAI vision failed ({detail})")
+              _log_local(f"OpenAI vision failed ({detail})")
         except Exception as e:
           cloudlog.warning(f"llm-agent: OpenAI request error: {e}")
+          _log_local(f"OpenAI request error: {e}")
       last_ping = now
 
     rk.keep_time()
