@@ -52,25 +52,27 @@ def _capture_front_camera_jpeg_b64() -> str | None:
     else:
       return None
 
-  client = VisionIpcClient("camerad", stream, True)
-  deadline = time.monotonic() + 2.0
-  while time.monotonic() < deadline and not client.connect(False):
+  # Camerad can be briefly unavailable or return no frame; retry a few times.
+  for _ in range(8):
+    client = VisionIpcClient("camerad", stream, True)
+    deadline = time.monotonic() + 0.4
+    while time.monotonic() < deadline and not client.connect(False):
+      time.sleep(0.03)
+
+    if client.is_connected() and client.num_buffers:
+      buf = client.recv()
+      if buf is not None:
+        rgb = extract_image(buf)
+        img = Image.fromarray(rgb)
+        img.thumbnail((960, 540))
+
+        with io.BytesIO() as out:
+          img.save(out, format="JPEG", quality=70, optimize=True)
+          return base64.b64encode(out.getvalue()).decode("utf-8")
+
     time.sleep(0.05)
 
-  if not client.is_connected() or not client.num_buffers:
-    return None
-
-  buf = client.recv()
-  if buf is None:
-    return None
-
-  rgb = extract_image(buf)
-  img = Image.fromarray(rgb)
-  img.thumbnail((960, 540))
-
-  with io.BytesIO() as out:
-    img.save(out, format="JPEG", quality=70, optimize=True)
-    return base64.b64encode(out.getvalue()).decode("utf-8")
+  return None
 
 
 def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
