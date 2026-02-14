@@ -7,6 +7,7 @@ import time
 import requests
 from PIL import Image
 from msgq.visionipc import VisionIpcClient, VisionStreamType
+import cereal.messaging as messaging
 
 from openpilot.common.params import Params
 from openpilot.common.realtime import Ratekeeper
@@ -96,6 +97,7 @@ def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
 
 def main():
   params = Params()
+  sm = messaging.SubMaster(['deviceState'])
   cloudlog.info("llm-agent: starting")
   rk = Ratekeeper(1.0)
   last_heartbeat = 0.0
@@ -103,6 +105,7 @@ def main():
   warned_no_key = False
 
   while True:
+    sm.update(0)
     now = time.monotonic()
     if now - last_heartbeat >= 60.0:
       enabled = params.get_bool("LLMAgentEnabled")
@@ -118,6 +121,8 @@ def main():
       else:
         warned_no_key = False
         try:
+          network_type = sm['deviceState'].networkType
+          cloudlog.info(f"llm-agent: vision attempt (networkType={network_type})")
           image_b64 = _capture_front_camera_jpeg_b64()
           if not image_b64:
             cloudlog.warning("llm-agent: no front camera frame available from camerad")
