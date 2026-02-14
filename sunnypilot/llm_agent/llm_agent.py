@@ -16,7 +16,7 @@ from openpilot.system.camerad.snapshot import extract_image
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL = "gpt-4o-mini"
 OPENAI_TIMEOUT_S = 15
-OPENAI_PING_INTERVAL_S = 300
+OPENAI_PING_INTERVAL_S = 10
 
 
 def _read_api_key(params: Params) -> str:
