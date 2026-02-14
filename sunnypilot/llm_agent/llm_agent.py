@@ -2,6 +2,7 @@
 import base64
 import io
 import os
+import subprocess
 import time
 
 import requests
@@ -18,6 +19,19 @@ OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL = "gpt-4o-mini"
 OPENAI_TIMEOUT_S = 15
 OPENAI_PING_INTERVAL_S = 10
+
+
+def _get_route_iface() -> str:
+  try:
+    out = subprocess.check_output(["ip", "route", "get", "1.1.1.1"], text=True, timeout=1.0).strip()
+    parts = out.split()
+    if "dev" in parts:
+      idx = parts.index("dev")
+      if idx + 1 < len(parts):
+        return parts[idx + 1]
+  except Exception:
+    pass
+  return "unknown"
 
 
 def _read_api_key(params: Params) -> str:
@@ -122,7 +136,8 @@ def main():
         warned_no_key = False
         try:
           network_type = sm['deviceState'].networkType
-          cloudlog.info(f"llm-agent: vision attempt (networkType={network_type})")
+          route_iface = _get_route_iface()
+          cloudlog.info(f"llm-agent: vision attempt (networkType={network_type}, routeIface={route_iface})")
           image_b64 = _capture_front_camera_jpeg_b64()
           if not image_b64:
             cloudlog.warning("llm-agent: no front camera frame available from camerad")
