@@ -69,17 +69,17 @@ def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
     "messages": [
       {
         "role": "system",
-        "content": "You describe road scenes for debugging. Be concise and factual.",
+        "content": "You summarize front road camera scenes for driving debug. Be concise and factual.",
       },
       {
         "role": "user",
         "content": [
-          {"type": "text", "text": "What do you see in this front road camera frame? One short sentence."},
+          {"type": "text", "text": "Give one short road-scene summary in 15 words or less. Mention lane/traffic/hazards/signals if visible. If this is not a drivable road scene, reply exactly: Not a drivable road scene."},
           {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
         ],
       },
     ],
-    "max_tokens": 80,
+    "max_tokens": 40,
     "temperature": 0,
   }
 
@@ -129,7 +129,7 @@ def main():
           else:
             ok, detail = _openai_vision_describe(api_key, image_b64)
             if ok:
-              cloudlog.info(f"llm-agent: vision says: {detail}")
+              cloudlog.info(f"llm-agent: road summary: {detail}")
             else:
               cloudlog.warning(f"llm-agent: OpenAI vision failed ({detail})")
         except Exception as e:
