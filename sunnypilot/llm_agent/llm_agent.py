@@ -20,9 +20,10 @@ OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL = "gpt-4o-mini"
 OPENAI_TIMEOUT_S = 15
 OPENAI_PING_INTERVAL_S = 10
-JPEG_MAX_SIZE = (640, 360)
-JPEG_QUALITY = 55
+JPEG_MAX_SIZE = (960, 540)
+JPEG_QUALITY = 70
 LOCAL_LOG_PATH = "/data/llm-agent-test/llm_agent_runtime.log"
+CAPTURE_DIR = "/data/llm-agent-test/captures"
 
 
 def _log_local(message: str) -> None:
@@ -57,7 +58,7 @@ def _read_api_key(params: Params) -> str:
   return os.getenv("OPENAI_API_KEY", "").strip()
 
 
-def _capture_front_camera_jpeg_b64() -> tuple[str, int] | None:
+def _capture_front_camera_jpeg_b64() -> tuple[str, int, str] | None:
   stream = VisionStreamType.VISION_STREAM_ROAD
   available = VisionIpcClient.available_streams("camerad", block=False)
   if stream not in available:
@@ -83,7 +84,12 @@ def _capture_front_camera_jpeg_b64() -> tuple[str, int] | None:
         with io.BytesIO() as out:
           img.save(out, format="JPEG", quality=JPEG_QUALITY, optimize=True)
           jpeg_bytes = out.getvalue()
-          return base64.b64encode(jpeg_bytes).decode("utf-8"), len(jpeg_bytes)
+          os.makedirs(CAPTURE_DIR, exist_ok=True)
+          stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+          capture_path = os.path.join(CAPTURE_DIR, f"{stamp}.jpg")
+          with open(capture_path, "wb") as f:
+            f.write(jpeg_bytes)
+          return base64.b64encode(jpeg_bytes).decode("utf-8"), len(jpeg_bytes), capture_path
 
     time.sleep(0.05)
 
@@ -100,17 +106,17 @@ def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
     "messages": [
       {
         "role": "system",
-        "content": "You summarize front road camera scenes for driving debug. Be concise and factual.",
+        "content": "You are a driving safety assistant. Be concise, factual, and road-focused.",
       },
       {
         "role": "user",
         "content": [
-          {"type": "text", "text": "Give one short road-scene summary in 15 words or less. Mention lane/traffic/hazards/signals if visible. If this is not a drivable road scene, reply exactly: Not a drivable road scene."},
+          {"type": "text", "text": "In exactly one sentence, start with 'Pay attention to' and describe the most relevant immediate road safety risk. If no clear risk, mention lane/traffic state briefly."},
           {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
         ],
       },
     ],
-    "max_tokens": 40,
+    "max_tokens": 48,
     "temperature": 0,
   }
 
@@ -161,9 +167,9 @@ def main():
             cloudlog.warning("llm-agent: no front camera frame available from camerad")
             _log_local("no front camera frame available from camerad")
           else:
-            image_b64, image_size = image_payload
+            image_b64, image_size, capture_path = image_payload
             cloudlog.info(f"llm-agent: encoded frame size={image_size}B")
-            _log_local(f"encoded frame size={image_size}B")
+            _log_local(f"encoded frame size={image_size}B capture={capture_path}")
             ok, detail = _openai_vision_describe(api_key, image_b64)
             if ok:
               cloudlog.info(f"llm-agent: road summary: {detail}")
