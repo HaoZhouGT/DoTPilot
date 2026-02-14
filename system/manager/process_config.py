@@ -69,7 +69,8 @@ def use_copyparty(started, params, CP: car.CarParams) -> bool:
   return bool(params.get_bool("EnableCopyparty"))
 
 def llm_agent_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
-  return started and params.get_bool("LLMAgentEnabled")
+  # Allow offroad testing when explicitly enabled.
+  return params.get_bool("LLMAgentEnabled")
 
 def sunnylink_ready_shim(started, params, CP: car.CarParams) -> bool:
   """Shim for sunnylink_ready to match the process manager signature."""
