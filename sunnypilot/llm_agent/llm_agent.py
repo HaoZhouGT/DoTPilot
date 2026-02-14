@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
+import base64
+import io
 import os
 import time
 
 import requests
+from PIL import Image
+from msgq.visionipc import VisionIpcClient, VisionStreamType
 
 from openpilot.common.params import Params
 from openpilot.common.realtime import Ratekeeper
 from openpilot.common.swaglog import cloudlog
+from openpilot.system.camerad.snapshot import extract_image
 
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL = "gpt-4o-mini"
@@ -21,7 +26,37 @@ def _read_api_key(params: Params) -> str:
   return os.getenv("OPENAI_API_KEY", "").strip()
 
 
-def _openai_ping(api_key: str) -> tuple[bool, str]:
+def _capture_front_camera_jpeg_b64() -> str | None:
+  stream = VisionStreamType.VISION_STREAM_ROAD
+  available = VisionIpcClient.available_streams("camerad", block=False)
+  if stream not in available:
+    if VisionStreamType.VISION_STREAM_WIDE_ROAD in available:
+      stream = VisionStreamType.VISION_STREAM_WIDE_ROAD
+    else:
+      return None
+
+  client = VisionIpcClient("camerad", stream, True)
+  deadline = time.monotonic() + 2.0
+  while time.monotonic() < deadline and not client.connect(False):
+    time.sleep(0.05)
+
+  if not client.is_connected() or not client.num_buffers:
+    return None
+
+  buf = client.recv()
+  if buf is None:
+    return None
+
+  rgb = extract_image(buf)
+  img = Image.fromarray(rgb)
+  img.thumbnail((960, 540))
+
+  with io.BytesIO() as out:
+    img.save(out, format="JPEG", quality=70, optimize=True)
+    return base64.b64encode(out.getvalue()).decode("utf-8")
+
+
+def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
   headers = {
     "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json",
@@ -29,10 +64,19 @@ def _openai_ping(api_key: str) -> tuple[bool, str]:
   payload = {
     "model": OPENAI_MODEL,
     "messages": [
-      {"role": "system", "content": "You are a concise driving assistant test endpoint."},
-      {"role": "user", "content": "Reply with exactly: llm-agent-online"},
+      {
+        "role": "system",
+        "content": "You describe road scenes for debugging. Be concise and factual.",
+      },
+      {
+        "role": "user",
+        "content": [
+          {"type": "text", "text": "What do you see in this front road camera frame? One short sentence."},
+          {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
+        ],
+      },
     ],
-    "max_tokens": 16,
+    "max_tokens": 80,
     "temperature": 0,
   }
 
@@ -72,11 +116,15 @@ def main():
       else:
         warned_no_key = False
         try:
-          ok, detail = _openai_ping(api_key)
-          if ok:
-            cloudlog.info(f"llm-agent: OpenAI ping ok ({detail})")
+          image_b64 = _capture_front_camera_jpeg_b64()
+          if not image_b64:
+            cloudlog.warning("llm-agent: no front camera frame available from camerad")
           else:
-            cloudlog.warning(f"llm-agent: OpenAI ping failed ({detail})")
+            ok, detail = _openai_vision_describe(api_key, image_b64)
+            if ok:
+              cloudlog.info(f"llm-agent: vision says: {detail}")
+            else:
+              cloudlog.warning(f"llm-agent: OpenAI vision failed ({detail})")
         except Exception as e:
           cloudlog.warning(f"llm-agent: OpenAI request error: {e}")
       last_ping = now
