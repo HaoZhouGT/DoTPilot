@@ -20,9 +20,11 @@ OPENAI_PING_INTERVAL_S = 10
 
 
 def _read_api_key(params: Params) -> str:
-  key = params.get("AgentApiKey", encoding="utf-8")
+  key = params.get("AgentApiKey")
   if key:
-    return key.strip()
+    if isinstance(key, bytes):
+      return key.decode("utf-8").strip()
+    return str(key).strip()
   return os.getenv("OPENAI_API_KEY", "").strip()
 
 
