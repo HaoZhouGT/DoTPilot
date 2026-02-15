@@ -134,7 +134,7 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     box_h = text_size.y + pad_y * 2
     box_w = min(box_w, rect.width * 0.56)
     box_x = rect.x + (rect.width - box_w) / 2
-    box_y = rect.y + 18
+    box_y = rect.y + (rect.height - box_h) / 2
 
     rl.draw_rectangle_rounded(rl.Rectangle(box_x, box_y, box_w, box_h), 0.22, 8, rl.Color(45, 0, 0, 220))
     rl.draw_rectangle_rounded_lines_ex(rl.Rectangle(box_x, box_y, box_w, box_h), 0.22, 8, 3, rl.Color(255, 80, 80, 255))

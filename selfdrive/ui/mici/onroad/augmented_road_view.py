@@ -287,7 +287,7 @@ class AugmentedRoadView(CameraView):
     label_h = 88
     label_w = min(rect.width * 0.56, 860)
     label_x = rect.x + (rect.width - label_w) / 2
-    label_y = rect.y + 18
+    label_y = rect.y + (rect.height - label_h) / 2
 
     self._llm_advisory_label.set_text(advisory)
     rl.draw_rectangle_rounded(rl.Rectangle(label_x, label_y, label_w, label_h), 0.22, 8, rl.Color(45, 0, 0, 220))
