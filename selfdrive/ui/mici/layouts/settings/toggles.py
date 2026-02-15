@@ -26,6 +26,7 @@ class TogglesLayoutMici(NavWidget):
     record_front = BigParamControl("record & upload driver camera", "RecordFront", toggle_callback=restart_needed_callback)
     record_mic = BigParamControl("record & upload mic audio", "RecordAudio", toggle_callback=restart_needed_callback)
     enable_openpilot = BigParamControl("enable sunnypilot", "OpenpilotEnabledToggle", toggle_callback=restart_needed_callback)
+    force_onroad_mode = BigParamControl("force onroad mode (test)", "ForceOnroadMode")
 
     self._scroller = Scroller([
       self._personality_toggle,
@@ -37,6 +38,7 @@ class TogglesLayoutMici(NavWidget):
       record_front,
       record_mic,
       enable_openpilot,
+      force_onroad_mode,
     ], snap_items=False)
 
     # Toggle lists
@@ -49,6 +51,7 @@ class TogglesLayoutMici(NavWidget):
       ("RecordFront", record_front),
       ("RecordAudio", record_mic),
       ("OpenpilotEnabledToggle", enable_openpilot),
+      ("ForceOnroadMode", force_onroad_mode),
     )
 
     enable_openpilot.set_enabled(lambda: not ui_state.engaged)

@@ -310,6 +310,10 @@
     "title": "Firmware Query Done",
     "description": ""
   },
+  "ForceOnroadMode": {
+    "title": "Force Onroad Mode (Test)",
+    "description": "For testing only: forces onroad mode without ignition so camera and onroad daemons run."
+  },
   "ForcePowerDown": {
     "title": "Force Power Down",
     "description": ""
