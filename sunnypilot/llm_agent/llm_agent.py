@@ -4,6 +4,7 @@ import io
 import os
 import subprocess
 import time
+import wave
 from datetime import datetime
 
 import requests
@@ -17,14 +18,21 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.system.camerad.snapshot import extract_image
 
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions"
 OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_AUDIO_MODEL = "gpt-4o-mini-transcribe"
 OPENAI_TIMEOUT_S = 15
 OPENAI_PING_INTERVAL_S = 10
+OPENAI_AUDIO_TIMEOUT_S = 20
 JPEG_MAX_SIZE = (960, 540)
 JPEG_QUALITY = 70
 LOCAL_LOG_PATH = "/data/llm-agent-test/llm_agent_runtime.log"
 CAPTURE_DIR = "/data/llm-agent-test/captures"
 ADVISORY_PARAM = "LLMAgentAdvisory"
+AUDIO_ENABLED_PARAM = "LLMAgentAudioEnabled"
+AUDIO_TRIGGER_PARAM = "LLMAgentAudioTrigger"
+AUDIO_CAPTURE_SECONDS = 2.0
+AUDIO_CAPTURE_TIMEOUT_S = 8.0
 
 
 def _log_local(message: str) -> None:
@@ -157,9 +165,76 @@ def _to_short_advisory(summary: str) -> str:
   return "Road hazard"
 
 
+def _capture_audio_prompt_wav(sm_audio: messaging.SubMaster) -> bytes | None:
+  pcm = bytearray()
+  sample_rate = 16000
+  target_bytes = int(AUDIO_CAPTURE_SECONDS * sample_rate * 2)
+  start = time.monotonic()
+
+  while time.monotonic() - start < AUDIO_CAPTURE_TIMEOUT_S:
+    sm_audio.update(100)
+    if not sm_audio.updated['rawAudioData']:
+      continue
+
+    msg = sm_audio['rawAudioData']
+    chunk = bytes(msg.data)
+    if not chunk:
+      continue
+
+    if int(msg.sampleRate) > 0 and int(msg.sampleRate) != sample_rate:
+      sample_rate = int(msg.sampleRate)
+      target_bytes = int(AUDIO_CAPTURE_SECONDS * sample_rate * 2)
+
+    pcm.extend(chunk)
+    if len(pcm) >= target_bytes:
+      break
+
+  if len(pcm) < target_bytes // 2:
+    return None
+
+  wav_io = io.BytesIO()
+  with wave.open(wav_io, "wb") as wf:
+    wf.setnchannels(1)
+    wf.setsampwidth(2)  # int16
+    wf.setframerate(sample_rate)
+    wf.writeframes(bytes(pcm[:target_bytes]))
+  return wav_io.getvalue()
+
+
+def _openai_transcribe_audio(api_key: str, wav_bytes: bytes) -> tuple[bool, str]:
+  headers = {"Authorization": f"Bearer {api_key}"}
+  files = {"file": ("prompt.wav", wav_bytes, "audio/wav")}
+  data = {"model": OPENAI_AUDIO_MODEL}
+  r = requests.post(OPENAI_TRANSCRIBE_URL, headers=headers, files=files, data=data, timeout=OPENAI_AUDIO_TIMEOUT_S)
+  if r.status_code < 200 or r.status_code >= 300:
+    return False, f"http {r.status_code}"
+
+  body = r.json()
+  text = str(body.get("text", "")).strip()
+  if len(text) > 120:
+    text = text[:120]
+  return True, text
+
+
+def _to_audio_advisory(transcript: str) -> str:
+  text = (transcript or "").strip().lower()
+  if not text:
+    return "Audio unclear"
+  if any(k in text for k in ("pothole", "rough", "bump")):
+    return "Pothole risk"
+  if any(k in text for k in ("pedestrian", "person", "walker")):
+    return "Pedestrian nearby"
+  if any(k in text for k in ("bike", "cyclist")):
+    return "Cyclist nearby"
+  if any(k in text for k in ("stop", "brake", "slow")):
+    return "Prepare to slow"
+  return "Voice request received"
+
+
 def main():
   params = Params()
   sm = messaging.SubMaster(['deviceState'])
+  sm_audio = messaging.SubMaster(['rawAudioData'])
   cloudlog.info("llm-agent: starting")
   rk = Ratekeeper(1.0)
   last_heartbeat = 0.0
@@ -169,13 +244,45 @@ def main():
   while True:
     sm.update(0)
     now = time.monotonic()
+    api_key = _read_api_key(params)
+    audio_enabled = params.get_bool(AUDIO_ENABLED_PARAM)
+    audio_triggered = params.get_bool(AUDIO_TRIGGER_PARAM)
     if now - last_heartbeat >= 60.0:
       enabled = params.get_bool("LLMAgentEnabled")
       cloudlog.info(f"llm-agent: alive (enabled={enabled})")
       last_heartbeat = now
 
+    if audio_enabled and audio_triggered:
+      if not api_key:
+        cloudlog.warning("llm-agent: audio trigger ignored, no API key")
+        _log_local("audio trigger ignored, no API key")
+      else:
+        warned_no_key = False
+        try:
+          params.put_bool(AUDIO_TRIGGER_PARAM, False)
+          cloudlog.info("llm-agent: audio trigger detected")
+          _log_local("audio trigger detected")
+          wav_bytes = _capture_audio_prompt_wav(sm_audio)
+          if not wav_bytes:
+            cloudlog.warning("llm-agent: audio capture failed")
+            _log_local("audio capture failed")
+          else:
+            ok_audio, transcript_or_error = _openai_transcribe_audio(api_key, wav_bytes)
+            if ok_audio:
+              transcript = transcript_or_error
+              advisory = _to_audio_advisory(transcript)
+              params.put(ADVISORY_PARAM, advisory)
+              cloudlog.info(f"llm-agent: audio transcript: {transcript}")
+              _log_local(f"audio transcript: {transcript}")
+              _log_local(f"ui advisory: {advisory}")
+            else:
+              cloudlog.warning(f"llm-agent: audio transcription failed ({transcript_or_error})")
+              _log_local(f"audio transcription failed ({transcript_or_error})")
+        except Exception as e:
+          cloudlog.warning(f"llm-agent: audio request error: {e}")
+          _log_local(f"audio request error: {e}")
+
     if now - last_ping >= OPENAI_PING_INTERVAL_S:
-      api_key = _read_api_key(params)
       if not api_key:
         if not warned_no_key:
           cloudlog.warning("llm-agent: no API key set (AgentApiKey or OPENAI_API_KEY)")
@@ -183,6 +290,7 @@ def main():
       else:
         warned_no_key = False
         try:
+
           network_type = sm['deviceState'].networkType
           route_iface = _get_route_iface()
           cloudlog.info(f"llm-agent: vision attempt (networkType={network_type}, routeIface={route_iface})")

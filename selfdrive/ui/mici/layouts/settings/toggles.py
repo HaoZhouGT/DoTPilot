@@ -23,6 +23,7 @@ class TogglesLayoutMici(NavWidget):
     ldw_toggle = BigParamControl("lane departure warnings", "IsLdwEnabled")
     always_on_dm_toggle = BigParamControl("always-on driver monitor", "AlwaysOnDM")
     llm_agent_toggle = BigParamControl("enable llm agent", "LLMAgentEnabled")
+    llm_agent_audio_toggle = BigParamControl("enable llm agent audio", "LLMAgentAudioEnabled")
     record_front = BigParamControl("record & upload driver camera", "RecordFront", toggle_callback=restart_needed_callback)
     record_mic = BigParamControl("record & upload mic audio", "RecordAudio", toggle_callback=restart_needed_callback)
     enable_openpilot = BigParamControl("enable sunnypilot", "OpenpilotEnabledToggle", toggle_callback=restart_needed_callback)
@@ -35,6 +36,7 @@ class TogglesLayoutMici(NavWidget):
       ldw_toggle,
       always_on_dm_toggle,
       llm_agent_toggle,
+      llm_agent_audio_toggle,
       record_front,
       record_mic,
       enable_openpilot,
@@ -48,6 +50,7 @@ class TogglesLayoutMici(NavWidget):
       ("IsLdwEnabled", ldw_toggle),
       ("AlwaysOnDM", always_on_dm_toggle),
       ("LLMAgentEnabled", llm_agent_toggle),
+      ("LLMAgentAudioEnabled", llm_agent_audio_toggle),
       ("RecordFront", record_front),
       ("RecordAudio", record_mic),
       ("OpenpilotEnabledToggle", enable_openpilot),

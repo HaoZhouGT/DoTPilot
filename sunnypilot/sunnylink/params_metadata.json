@@ -608,6 +608,14 @@
     "title": "LLM Agent Safety Advisory",
     "description": ""
   },
+  "LLMAgentAudioEnabled": {
+    "title": "Enable LLM Agent Audio",
+    "description": "Allow one-shot voice prompt capture for llm-agent when LLMAgentAudioTrigger is set."
+  },
+  "LLMAgentAudioTrigger": {
+    "title": "LLM Agent Audio Trigger",
+    "description": "One-shot trigger for llm-agent to capture and process a short microphone prompt."
+  },
   "LiveDelay": {
     "title": "Live Delay",
     "description": ""
