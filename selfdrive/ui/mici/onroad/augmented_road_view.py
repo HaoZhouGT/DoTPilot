@@ -279,19 +279,19 @@ class AugmentedRoadView(CameraView):
     if not advisory:
       return
 
-    max_len = 40
+    max_len = 28
     if len(advisory) > max_len:
       advisory = advisory[:max_len - 1].rstrip() + "…"
 
-    label_h = 74
-    label_w = min(rect.width - 80, 860)
+    label_h = 86
+    label_w = min(rect.width * 0.62, 860)
     label_x = rect.x + (rect.width - label_w) / 2
-    label_y = rect.y + rect.height - label_h - 28
+    label_y = rect.y + rect.height * 0.23
 
     self._llm_advisory_label.set_text(advisory)
     rl.draw_rectangle_rounded(rl.Rectangle(label_x, label_y, label_w, label_h), 0.25, 8, rl.Color(35, 0, 0, 185))
     rl.draw_rectangle_rounded_lines_ex(rl.Rectangle(label_x, label_y, label_w, label_h), 0.25, 8, 3, rl.Color(220, 45, 45, 230))
-    self._llm_advisory_label.render(rl.Rectangle(label_x, label_y + 2, label_w, label_h))
+    self._llm_advisory_label.render(rl.Rectangle(label_x, label_y + 4, label_w, label_h))
 
   def _switch_stream_if_needed(self, sm):
     if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:

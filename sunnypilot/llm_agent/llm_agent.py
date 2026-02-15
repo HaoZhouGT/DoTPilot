@@ -142,6 +142,8 @@ def _to_short_advisory(summary: str) -> str:
     return "Pedestrian nearby"
   if any(k in text for k in ("cyclist", "bicycl", "bike rider")):
     return "Cyclist nearby"
+  if any(k in text for k in ("pothole", "rough road", "uneven road", "broken pavement")):
+    return "Pothole risk"
   if any(k in text for k in ("obstacle", "debris", "object in road")):
     return "Obstacle ahead"
   if any(k in text for k in ("low visibility", "reduced visibility", "dark", "dimly lit", "fog")):
@@ -152,13 +154,7 @@ def _to_short_advisory(summary: str) -> str:
     return "Vehicle ahead"
   if any(k in text for k in ("not a drivable road scene", "lack of visible road", "no visible road", "limited road context")):
     return "Road context unclear"
-
-  cleaned = "".join(ch if ch.isalnum() or ch.isspace() else " " for ch in text)
-  words = [w for w in cleaned.split() if w not in {"the", "a", "an", "of", "to", "and", "in"}]
-  fallback = " ".join(words[:3]).strip()
-  if not fallback:
-    return "Stay alert"
-  return fallback.capitalize()[:32]
+  return "Road hazard"
 
 
 def main():

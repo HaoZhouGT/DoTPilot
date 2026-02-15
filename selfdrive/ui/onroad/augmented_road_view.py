@@ -121,21 +121,23 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     if not advisory:
       return
 
-    max_len = 40
+    max_len = 28
     if len(advisory) > max_len:
       advisory = advisory[:max_len - 1].rstrip() + "…"
 
-    font_size = 46
+    font_size = 54
     text_size = rl.measure_text_ex(self._font_medium, advisory, font_size, 0)
-    pad_x, pad_y = 24, 12
+    pad_x, pad_y = 28, 14
     box_w = text_size.x + pad_x * 2
     box_h = text_size.y + pad_y * 2
+    box_w = min(box_w, rect.width * 0.62)
     box_x = rect.x + (rect.width - box_w) / 2
-    box_y = rect.y + rect.height - box_h - 34
+    box_y = rect.y + rect.height * 0.23
 
     rl.draw_rectangle_rounded(rl.Rectangle(box_x, box_y, box_w, box_h), 0.25, 8, rl.Color(35, 0, 0, 185))
     rl.draw_rectangle_rounded_lines_ex(rl.Rectangle(box_x, box_y, box_w, box_h), 0.25, 8, 3, rl.Color(220, 45, 45, 230))
-    rl.draw_text_ex(self._font_medium, advisory, rl.Vector2(box_x + pad_x, box_y + pad_y), font_size, 0, rl.Color(255, 90, 90, 255))
+    text_pos = rl.Vector2(box_x + (box_w - text_size.x) / 2, box_y + pad_y)
+    rl.draw_text_ex(self._font_medium, advisory, text_pos, font_size, 0, rl.Color(255, 90, 90, 255))
 
   def _handle_mouse_press(self, _):
     if not self._hud_renderer.user_interacting() and self._click_callback is not None:
