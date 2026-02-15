@@ -127,9 +127,9 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
       advisory = advisory[:max_len - 1].rstrip() + "…"
     advisory = advisory.upper()
 
-    font_size = 50
+    font_size = 70
     text_size = rl.measure_text_ex(self._font_bold, advisory, font_size, 0)
-    pad_x, pad_y = 32, 14
+    pad_x, pad_y = 36, 18
     box_w = max(text_size.x + pad_x * 2, rect.width * 0.42)
     box_h = text_size.y + pad_y * 2
     box_w = min(box_w, rect.width * 0.56)

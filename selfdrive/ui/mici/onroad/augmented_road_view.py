@@ -167,7 +167,7 @@ class AugmentedRoadView(CameraView):
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                        alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
-    self._llm_advisory_label = UnifiedLabel("", 50, FontWeight.BOLD,
+    self._llm_advisory_label = UnifiedLabel("", 66, FontWeight.BOLD,
                                             text_color=rl.Color(255, 235, 235, 255),
                                             alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                             alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
@@ -284,7 +284,7 @@ class AugmentedRoadView(CameraView):
       advisory = advisory[:max_len - 1].rstrip() + "…"
     advisory = advisory.upper()
 
-    label_h = 88
+    label_h = 112
     label_w = min(rect.width * 0.56, 860)
     label_x = rect.x + (rect.width - label_w) / 2
     label_y = rect.y + (rect.height - label_h) / 2
@@ -292,7 +292,7 @@ class AugmentedRoadView(CameraView):
     self._llm_advisory_label.set_text(advisory)
     rl.draw_rectangle_rounded(rl.Rectangle(label_x, label_y, label_w, label_h), 0.22, 8, rl.Color(45, 0, 0, 220))
     rl.draw_rectangle_rounded_lines_ex(rl.Rectangle(label_x, label_y, label_w, label_h), 0.22, 8, 3, rl.Color(255, 80, 80, 255))
-    self._llm_advisory_label.render(rl.Rectangle(label_x, label_y + 4, label_w, label_h))
+    self._llm_advisory_label.render(rl.Rectangle(label_x, label_y + 6, label_w, label_h))
 
   def _switch_stream_if_needed(self, sm):
     if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
