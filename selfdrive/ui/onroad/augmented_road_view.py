@@ -57,6 +57,7 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     self.alert_renderer = AlertRenderer()
     self.driver_state_renderer = DriverStateRenderer()
     self._font_medium = gui_app.font(FontWeight.MEDIUM)
+    self._font_bold = gui_app.font(FontWeight.BOLD)
 
     # debug
     self._pm = messaging.PubMaster(['uiDebug'])
@@ -121,23 +122,24 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     if not advisory:
       return
 
-    max_len = 28
+    max_len = 24
     if len(advisory) > max_len:
       advisory = advisory[:max_len - 1].rstrip() + "…"
+    advisory = advisory.upper()
 
-    font_size = 54
-    text_size = rl.measure_text_ex(self._font_medium, advisory, font_size, 0)
-    pad_x, pad_y = 28, 14
-    box_w = text_size.x + pad_x * 2
+    font_size = 50
+    text_size = rl.measure_text_ex(self._font_bold, advisory, font_size, 0)
+    pad_x, pad_y = 32, 14
+    box_w = max(text_size.x + pad_x * 2, rect.width * 0.42)
     box_h = text_size.y + pad_y * 2
-    box_w = min(box_w, rect.width * 0.62)
+    box_w = min(box_w, rect.width * 0.56)
     box_x = rect.x + (rect.width - box_w) / 2
-    box_y = rect.y + rect.height * 0.23
+    box_y = rect.y + 18
 
-    rl.draw_rectangle_rounded(rl.Rectangle(box_x, box_y, box_w, box_h), 0.25, 8, rl.Color(35, 0, 0, 185))
-    rl.draw_rectangle_rounded_lines_ex(rl.Rectangle(box_x, box_y, box_w, box_h), 0.25, 8, 3, rl.Color(220, 45, 45, 230))
+    rl.draw_rectangle_rounded(rl.Rectangle(box_x, box_y, box_w, box_h), 0.22, 8, rl.Color(45, 0, 0, 220))
+    rl.draw_rectangle_rounded_lines_ex(rl.Rectangle(box_x, box_y, box_w, box_h), 0.22, 8, 3, rl.Color(255, 80, 80, 255))
     text_pos = rl.Vector2(box_x + (box_w - text_size.x) / 2, box_y + pad_y)
-    rl.draw_text_ex(self._font_medium, advisory, text_pos, font_size, 0, rl.Color(255, 90, 90, 255))
+    rl.draw_text_ex(self._font_bold, advisory, text_pos, font_size, 0, rl.Color(255, 235, 235, 255))
 
   def _handle_mouse_press(self, _):
     if not self._hud_renderer.user_interacting() and self._click_callback is not None:
