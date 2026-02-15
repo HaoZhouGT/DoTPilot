@@ -3,7 +3,7 @@ from collections.abc import Callable
 from cereal import log
 
 from openpilot.system.ui.widgets.scroller import Scroller
-from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl, BigMultiParamToggle
+from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl, BigMultiParamToggle, BigButton
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import NavWidget
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
@@ -28,6 +28,8 @@ class TogglesLayoutMici(NavWidget):
     record_mic = BigParamControl("record & upload mic audio", "RecordAudio", toggle_callback=restart_needed_callback)
     enable_openpilot = BigParamControl("enable sunnypilot", "OpenpilotEnabledToggle", toggle_callback=restart_needed_callback)
     force_onroad_mode = BigParamControl("force onroad mode (test)", "ForceOnroadMode")
+    llm_audio_trigger_btn = BigButton("trigger llm audio prompt", "tap to capture")
+    llm_audio_trigger_btn.set_click_callback(lambda: ui_state.params.put_bool("LLMAgentAudioTrigger", True))
 
     self._scroller = Scroller([
       self._personality_toggle,
@@ -41,6 +43,7 @@ class TogglesLayoutMici(NavWidget):
       record_mic,
       enable_openpilot,
       force_onroad_mode,
+      llm_audio_trigger_btn,
     ], snap_items=False)
 
     # Toggle lists
@@ -56,6 +59,7 @@ class TogglesLayoutMici(NavWidget):
       ("OpenpilotEnabledToggle", enable_openpilot),
       ("ForceOnroadMode", force_onroad_mode),
     )
+    self._llm_audio_trigger_btn = llm_audio_trigger_btn
 
     enable_openpilot.set_enabled(lambda: not ui_state.engaged)
     record_front.set_enabled(False if ui_state.params.get_bool("RecordFrontLock") else (lambda: not ui_state.engaged))
@@ -99,6 +103,10 @@ class TogglesLayoutMici(NavWidget):
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
+
+    audio_ready = ui_state.params.get_bool("LLMAgentEnabled") and ui_state.params.get_bool("LLMAgentAudioEnabled")
+    self._llm_audio_trigger_btn.set_enabled(audio_ready)
+    self._llm_audio_trigger_btn.set_value("tap to capture" if audio_ready else "enable llm + audio first")
 
   def _render(self, rect: rl.Rectangle):
     self._scroller.render(rect)

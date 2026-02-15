@@ -1,7 +1,7 @@
 from cereal import log
 from openpilot.common.params import Params, UnknownKeyName
 from openpilot.system.ui.widgets import Widget
-from openpilot.system.ui.widgets.list_view import multiple_button_item, toggle_item
+from openpilot.system.ui.widgets.list_view import multiple_button_item, toggle_item, button_item
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.system.ui.lib.application import gui_app
@@ -12,6 +12,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 if gui_app.sunnypilot_ui():
   from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp as toggle_item
   from openpilot.system.ui.sunnypilot.widgets.list_view import multiple_button_item_sp as multiple_button_item
+  from openpilot.system.ui.sunnypilot.widgets.list_view import button_item_sp as button_item
 
 PERSONALITY_TO_INT = log.LongitudinalPersonality.schema.enumerants
 
@@ -161,6 +162,13 @@ class TogglesLayout(Widget):
       # insert longitudinal personality after NDOG toggle
       if param == "DisengageOnAccelerator":
         self._toggles["LongitudinalPersonality"] = self._long_personality_setting
+      if param == "LLMAgentAudioEnabled":
+        self._audio_trigger_btn = button_item(
+          lambda: tr("Trigger LLM Audio Prompt"),
+          lambda: tr("TRIGGER"),
+          callback=self._trigger_llm_audio_prompt,
+        )
+        self._toggles["LLMAgentAudioTriggerButton"] = self._audio_trigger_btn
 
     self._update_experimental_mode_icon()
     self._scroller = Scroller(list(self._toggles.values()), line_separator=True, spacing=0)
@@ -231,6 +239,10 @@ class TogglesLayout(Widget):
       if self._toggle_defs[toggle_def][3] and toggle_def not in self._locked_toggles:
         self._toggles[toggle_def].action_item.set_enabled(not ui_state.engaged)
 
+    if hasattr(self, "_audio_trigger_btn"):
+      enabled = self._params.get_bool("LLMAgentEnabled") and self._params.get_bool("LLMAgentAudioEnabled")
+      self._audio_trigger_btn.action_item.set_enabled(enabled)
+
   def _render(self, rect):
     self._scroller.render(rect)
 
@@ -269,3 +281,6 @@ class TogglesLayout(Widget):
 
   def _set_longitudinal_personality(self, button_index: int):
     self._params.put("LongitudinalPersonality", button_index)
+
+  def _trigger_llm_audio_prompt(self):
+    self._params.put_bool("LLMAgentAudioTrigger", True)
