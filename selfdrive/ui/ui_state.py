@@ -84,6 +84,7 @@ class UIState(UIStateSP):
     self.has_longitudinal_control: bool = False
     self.CP: car.CarParams | None = None
     self.light_sensor: float = -1.0
+    self.llm_advisory: str = ""
     self._param_update_time: float = 0.0
 
     # Callbacks
@@ -189,6 +190,8 @@ class UIState(UIStateSP):
         self.has_longitudinal_control = self.params.get_bool("AlphaLongitudinalEnabled")
       else:
         self.has_longitudinal_control = self.CP.openpilotLongitudinalControl
+    advisory = self.params.get("LLMAgentAdvisory")
+    self.llm_advisory = advisory.decode("utf-8", "ignore").strip() if isinstance(advisory, bytes) else str(advisory or "").strip()
     UIStateSP.update_params(self)
     self._param_update_time = time.monotonic()
 

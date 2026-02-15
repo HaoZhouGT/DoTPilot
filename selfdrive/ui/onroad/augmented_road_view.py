@@ -10,7 +10,7 @@ from openpilot.selfdrive.ui.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.onroad.cameraview import CameraView
-from openpilot.system.ui.lib.application import gui_app
+from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
 
@@ -56,6 +56,7 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     self._hud_renderer = HudRenderer()
     self.alert_renderer = AlertRenderer()
     self.driver_state_renderer = DriverStateRenderer()
+    self._font_medium = gui_app.font(FontWeight.MEDIUM)
 
     # debug
     self._pm = messaging.PubMaster(['uiDebug'])
@@ -97,6 +98,7 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     self._hud_renderer.render(self._content_rect)
     self.alert_renderer.render(self._content_rect)
     self.driver_state_renderer.render(self._content_rect)
+    self._draw_llm_advisory(self._content_rect)
 
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds
@@ -111,6 +113,28 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     msg = messaging.new_message('uiDebug')
     msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
     self._pm.send('uiDebug', msg)
+
+  def _draw_llm_advisory(self, rect: rl.Rectangle) -> None:
+    if not ui_state.started:
+      return
+    advisory = ui_state.llm_advisory
+    if not advisory:
+      return
+
+    max_len = 56
+    if len(advisory) > max_len:
+      advisory = advisory[:max_len - 1].rstrip() + "…"
+
+    font_size = 34
+    text_size = rl.measure_text_ex(self._font_medium, advisory, font_size, 0)
+    pad_x, pad_y = 20, 10
+    box_w = text_size.x + pad_x * 2
+    box_h = text_size.y + pad_y * 2
+    box_x = rect.x + (rect.width - box_w) / 2
+    box_y = rect.y + rect.height - box_h - 34
+
+    rl.draw_rectangle_rounded(rl.Rectangle(box_x, box_y, box_w, box_h), 0.25, 8, rl.Color(0, 0, 0, 150))
+    rl.draw_text_ex(self._font_medium, advisory, rl.Vector2(box_x + pad_x, box_y + pad_y), font_size, 0, rl.WHITE)
 
   def _handle_mouse_press(self, _):
     if not self._hud_renderer.user_interacting() and self._click_callback is not None:

@@ -604,6 +604,10 @@
     "title": "Enable LLM Agent",
     "description": ""
   },
+  "LLMAgentAdvisory": {
+    "title": "LLM Agent Safety Advisory",
+    "description": ""
+  },
   "LiveDelay": {
     "title": "Live Delay",
     "description": ""

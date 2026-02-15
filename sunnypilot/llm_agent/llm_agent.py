@@ -24,6 +24,7 @@ JPEG_MAX_SIZE = (960, 540)
 JPEG_QUALITY = 70
 LOCAL_LOG_PATH = "/data/llm-agent-test/llm_agent_runtime.log"
 CAPTURE_DIR = "/data/llm-agent-test/captures"
+ADVISORY_PARAM = "LLMAgentAdvisory"
 
 
 def _log_local(message: str) -> None:
@@ -132,6 +133,18 @@ def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
   return True, content or "ok"
 
 
+def _to_short_advisory(summary: str) -> str:
+  text = (summary or "").strip()
+  if text.lower().startswith("pay attention to"):
+    text = text[len("pay attention to"):].strip(" :,-.")
+  words = text.split()
+  short = " ".join(words[:7]).strip()
+  if not short:
+    short = "stay alert to current road conditions"
+  advisory = f"Caution: {short}"
+  return advisory[:60]
+
+
 def main():
   params = Params()
   sm = messaging.SubMaster(['deviceState'])
@@ -172,8 +185,11 @@ def main():
             _log_local(f"encoded frame size={image_size}B capture={capture_path}")
             ok, detail = _openai_vision_describe(api_key, image_b64)
             if ok:
+              advisory = _to_short_advisory(detail)
+              params.put(ADVISORY_PARAM, advisory)
               cloudlog.info(f"llm-agent: road summary: {detail}")
               _log_local(f"road summary: {detail}")
+              _log_local(f"ui advisory: {advisory}")
             else:
               cloudlog.warning(f"llm-agent: OpenAI vision failed ({detail})")
               _log_local(f"OpenAI vision failed ({detail})")

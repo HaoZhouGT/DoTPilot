@@ -167,6 +167,10 @@ class AugmentedRoadView(CameraView):
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                        alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
+    self._llm_advisory_label = UnifiedLabel("", 32, FontWeight.MEDIUM,
+                                            text_color=rl.WHITE,
+                                            alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
+                                            alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
 
     self._fade_texture = gui_app.texture("icons_mici/onroad/onroad_fade.png")
     self._fade_alpha_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
@@ -244,6 +248,7 @@ class AugmentedRoadView(CameraView):
     if ui_state.started:
       self._alert_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)
+    self._draw_llm_advisory(self._content_rect)
 
     # Draw fake rounded border
     rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, rl.BLACK)
@@ -266,6 +271,26 @@ class AugmentedRoadView(CameraView):
     msg = messaging.new_message('uiDebug')
     msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
     self._pm.send('uiDebug', msg)
+
+  def _draw_llm_advisory(self, rect: rl.Rectangle) -> None:
+    if not ui_state.started:
+      return
+    advisory = ui_state.llm_advisory
+    if not advisory:
+      return
+
+    max_len = 56
+    if len(advisory) > max_len:
+      advisory = advisory[:max_len - 1].rstrip() + "…"
+
+    label_h = 56
+    label_w = min(rect.width - 80, 860)
+    label_x = rect.x + (rect.width - label_w) / 2
+    label_y = rect.y + rect.height - label_h - 28
+
+    self._llm_advisory_label.set_text(advisory)
+    rl.draw_rectangle_rounded(rl.Rectangle(label_x, label_y, label_w, label_h), 0.25, 8, rl.Color(0, 0, 0, 150))
+    self._llm_advisory_label.render(rl.Rectangle(label_x, label_y + 2, label_w, label_h))
 
   def _switch_stream_if_needed(self, sm):
     if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
