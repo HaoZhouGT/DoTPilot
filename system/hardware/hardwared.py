@@ -319,8 +319,9 @@ def hardware_thread(end_event, hw_queue) -> None:
 
     # user-forced status
     offroad_mode = params.get_bool("OffroadMode")
-    startup_conditions["not_always_offroad"] = not offroad_mode
-    onroad_conditions["not_always_offroad"] = not offroad_mode
+    force_onroad_mode = params.get_bool("ForceOnroadMode")
+    startup_conditions["not_always_offroad"] = (not offroad_mode) or force_onroad_mode
+    onroad_conditions["not_always_offroad"] = (not offroad_mode) or force_onroad_mode
 
     # if an unsupported device and branch is detected, going onroad is blocked
     # only allow going onroad when:
@@ -342,6 +343,8 @@ def hardware_thread(end_event, hw_queue) -> None:
     should_start = all(onroad_conditions.values())
     if started_ts is None:
       should_start = should_start and all(startup_conditions.values())
+    if force_onroad_mode and onroad_conditions["not_tici"]:
+      should_start = True
 
     if should_start != should_start_prev or (count == 0):
       params.put_bool("IsEngaged", False)
@@ -407,7 +410,7 @@ def hardware_thread(end_event, hw_queue) -> None:
       cloudlog.warning(f"shutting device down, offroad since {off_ts}")
       params.put_bool("DoShutdown", True)
 
-    msg.deviceState.started = started_ts is not None and not offroad_mode
+    msg.deviceState.started = started_ts is not None and (force_onroad_mode or not offroad_mode)
     msg.deviceState.startedMonoTime = int(1e9*(started_ts or 0))
 
     last_ping = params.get("LastAthenaPingTime")
