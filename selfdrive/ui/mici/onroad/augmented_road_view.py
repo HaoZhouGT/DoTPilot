@@ -167,8 +167,8 @@ class AugmentedRoadView(CameraView):
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                        alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
-    self._llm_advisory_label = UnifiedLabel("", 32, FontWeight.MEDIUM,
-                                            text_color=rl.WHITE,
+    self._llm_advisory_label = UnifiedLabel("", 42, FontWeight.MEDIUM,
+                                            text_color=rl.Color(255, 90, 90, 255),
                                             alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                             alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
 
@@ -279,17 +279,18 @@ class AugmentedRoadView(CameraView):
     if not advisory:
       return
 
-    max_len = 56
+    max_len = 40
     if len(advisory) > max_len:
       advisory = advisory[:max_len - 1].rstrip() + "…"
 
-    label_h = 56
+    label_h = 74
     label_w = min(rect.width - 80, 860)
     label_x = rect.x + (rect.width - label_w) / 2
     label_y = rect.y + rect.height - label_h - 28
 
     self._llm_advisory_label.set_text(advisory)
-    rl.draw_rectangle_rounded(rl.Rectangle(label_x, label_y, label_w, label_h), 0.25, 8, rl.Color(0, 0, 0, 150))
+    rl.draw_rectangle_rounded(rl.Rectangle(label_x, label_y, label_w, label_h), 0.25, 8, rl.Color(35, 0, 0, 185))
+    rl.draw_rectangle_rounded_lines_ex(rl.Rectangle(label_x, label_y, label_w, label_h), 0.25, 8, 3, rl.Color(220, 45, 45, 230))
     self._llm_advisory_label.render(rl.Rectangle(label_x, label_y + 2, label_w, label_h))
 
   def _switch_stream_if_needed(self, sm):

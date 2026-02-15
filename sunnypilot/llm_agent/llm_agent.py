@@ -134,15 +134,31 @@ def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
 
 
 def _to_short_advisory(summary: str) -> str:
-  text = (summary or "").strip()
-  if text.lower().startswith("pay attention to"):
+  text = (summary or "").strip().lower()
+  if text.startswith("pay attention to"):
     text = text[len("pay attention to"):].strip(" :,-.")
-  words = text.split()
-  short = " ".join(words[:7]).strip()
-  if not short:
-    short = "stay alert to current road conditions"
-  advisory = f"Caution: {short}"
-  return advisory[:60]
+
+  if any(k in text for k in ("pedestrian", "walker", "person crossing")):
+    return "Pedestrian nearby"
+  if any(k in text for k in ("cyclist", "bicycl", "bike rider")):
+    return "Cyclist nearby"
+  if any(k in text for k in ("obstacle", "debris", "object in road")):
+    return "Obstacle ahead"
+  if any(k in text for k in ("low visibility", "reduced visibility", "dark", "dimly lit", "fog")):
+    return "Low visibility"
+  if "lane" in text and any(k in text for k in ("unclear", "not visible", "faded", "marking")):
+    return "Lane unclear"
+  if any(k in text for k in ("vehicle ahead", "lead vehicle", "close following")):
+    return "Vehicle ahead"
+  if any(k in text for k in ("not a drivable road scene", "lack of visible road", "no visible road", "limited road context")):
+    return "Road context unclear"
+
+  cleaned = "".join(ch if ch.isalnum() or ch.isspace() else " " for ch in text)
+  words = [w for w in cleaned.split() if w not in {"the", "a", "an", "of", "to", "and", "in"}]
+  fallback = " ".join(words[:3]).strip()
+  if not fallback:
+    return "Stay alert"
+  return fallback.capitalize()[:32]
 
 
 def main():
