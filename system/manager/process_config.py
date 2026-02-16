@@ -105,6 +105,11 @@ def uploader_ready(started: bool, params: Params, CP: car.CarParams) -> bool:
 
   return always_run(started, params, CP)
 
+def dropbox_uploader_ready(started: bool, params: Params, CP: car.CarParams) -> bool:
+  if not params.get_bool("EnableDropboxUploader"):
+    return False
+  return uploader_ready(started, params, CP)
+
 def or_(*fns):
   return lambda *args: operator.or_(*(fn(*args) for fn in fns))
 
@@ -155,6 +160,7 @@ procs = [
   PythonProcess("tombstoned", "system.tombstoned", always_run, enabled=not PC),
   PythonProcess("updated", "system.updated.updated", only_offroad, enabled=not PC),
   PythonProcess("uploader", "system.loggerd.uploader", uploader_ready),
+  PythonProcess("dropbox_uploader", "system.loggerd.dropbox_uploader", dropbox_uploader_ready),
   PythonProcess("statsd", "system.statsd", always_run),
   PythonProcess("feedbackd", "selfdrive.ui.feedback.feedbackd", only_onroad),
 
