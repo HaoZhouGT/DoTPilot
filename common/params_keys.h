@@ -160,6 +160,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"DropboxAppSecret", {PERSISTENT, STRING}},
     {"DropboxRefreshToken", {PERSISTENT, STRING}},
     {"DropboxUploadFolder", {PERSISTENT, STRING, "/DoTPilotDrives"}},
+    {"DropboxUploadPendingCount", {CLEAR_ON_MANAGER_START, INT, "0"}},
     {"EnableDropboxUploader", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"EnableCopyparty", {PERSISTENT | BACKUP, BOOL}},
     {"EnableGithubRunner", {PERSISTENT | BACKUP, BOOL}},

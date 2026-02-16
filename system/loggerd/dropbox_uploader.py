@@ -361,11 +361,18 @@ def main(exit_event: threading.Event | None = None) -> None:
   params = Params()
   sm = messaging.SubMaster(["deviceState"])
   uploader = DropboxUploader(Paths.log_root())
+  last_pending_count_update = 0.0
 
   backoff = 0.1
   while not exit_event.is_set():
     sm.update(0)
     offroad = params.get_bool("IsOffroad")
+    now = time.monotonic()
+    if (now - last_pending_count_update) >= 10.0:
+      pending_count = len(list(uploader.list_upload_files(False)))
+      params.put("DropboxUploadPendingCount", str(pending_count))
+      last_pending_count_update = now
+
     network_type = sm["deviceState"].networkType if not force_wifi else NetworkType.wifi
     # Dropbox uploader is intended for high-bandwidth Wi-Fi syncing only.
     if network_type != NetworkType.wifi:
