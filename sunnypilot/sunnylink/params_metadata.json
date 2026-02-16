@@ -294,6 +294,10 @@
     "title": "Dropbox Upload Folder",
     "description": ""
   },
+  "DropboxUploadPendingCount": {
+    "title": "Dropbox Upload Pending Count",
+    "description": ""
+  },
   "DriverTooDistracted": {
     "title": "Driver Too Distracted",
     "description": ""
