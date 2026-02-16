@@ -88,6 +88,22 @@ class DropboxUploader:
       root = "/" + root
     return root.rstrip("/") or "/DoTPilotDrives"
 
+  @staticmethod
+  def _route_grouped_key(logdir: str, name: str) -> str:
+    # Route segments are stored locally as "<route>--<segment>".
+    # Group uploads as "<route>/<segment>/<file>" in Dropbox.
+    if logdir in ("boot", "crash"):
+      return os.path.join(logdir, name)
+
+    if "--" not in logdir:
+      return os.path.join(logdir, name)
+
+    route, segment = logdir.rsplit("--", 1)
+    if segment.isdigit():
+      return os.path.join(route, segment, name)
+
+    return os.path.join(logdir, name)
+
   def get_access_token(self) -> str | None:
     now = time.monotonic()
     if self._access_token is not None and now < self._access_token_expiry_mono:
@@ -147,7 +163,7 @@ class DropboxUploader:
         continue
 
       for name in sorted(names, key=lambda n: self.immediate_priority.get(n, 1000)):
-        key = os.path.join(logdir, name)
+        key = self._route_grouped_key(logdir, name)
         fn = os.path.join(path, name)
         try:
           is_uploaded = getxattr(fn, UPLOAD_ATTR_NAME) == UPLOAD_ATTR_VALUE
