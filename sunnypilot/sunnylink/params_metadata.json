@@ -274,6 +274,26 @@
     "title": "Device ID",
     "description": ""
   },
+  "DropboxAccessToken": {
+    "title": "Dropbox Access Token",
+    "description": ""
+  },
+  "DropboxAppKey": {
+    "title": "Dropbox App Key",
+    "description": ""
+  },
+  "DropboxAppSecret": {
+    "title": "Dropbox App Secret",
+    "description": ""
+  },
+  "DropboxRefreshToken": {
+    "title": "Dropbox Refresh Token",
+    "description": ""
+  },
+  "DropboxUploadFolder": {
+    "title": "Dropbox Upload Folder",
+    "description": ""
+  },
   "DriverTooDistracted": {
     "title": "Driver Too Distracted",
     "description": ""
@@ -284,6 +304,10 @@
   },
   "EnableCopyparty": {
     "title": "copyparty Service",
+    "description": ""
+  },
+  "EnableDropboxUploader": {
+    "title": "Enable Dropbox Uploader",
     "description": ""
   },
   "EnableGithubRunner": {
