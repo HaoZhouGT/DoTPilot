@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import datetime
 import json
 import os
 import random
@@ -29,11 +28,6 @@ DROPBOX_API_HOST = "https://api.dropboxapi.com"
 DROPBOX_SINGLE_UPLOAD_LIMIT = 150 * 1024 * 1024
 DROPBOX_CHUNK_SIZE = 8 * 1024 * 1024
 DROPBOX_ACCESS_TOKEN_GRACE = 60
-
-MAX_UPLOAD_SIZES = {
-  "qlog": 25 * 1e6,
-  "qcam": 5 * 1e6,
-}
 
 allow_sleep = bool(int(os.getenv("UPLOADER_SLEEP", "1")))
 force_wifi = os.getenv("FORCEWIFI") is not None
@@ -141,10 +135,7 @@ class DropboxUploader:
       cloudlog.exception("dropbox_token_refresh_exception")
       return None
 
-  def list_upload_files(self, metered: bool) -> Iterator[tuple[str, str, str]]:
-    r = self.params.get("AthenadRecentlyViewedRoutes")
-    requested_routes = [] if r is None else [route for route in r.split(",") if route]
-
+  def list_upload_files(self, _metered: bool) -> Iterator[tuple[str, str, str]]:
     for logdir in listdir_by_creation(self.root):
       path = os.path.join(self.root, logdir)
       try:
@@ -159,7 +150,6 @@ class DropboxUploader:
         key = os.path.join(logdir, name)
         fn = os.path.join(path, name)
         try:
-          ctime = os.path.getctime(fn)
           is_uploaded = getxattr(fn, UPLOAD_ATTR_NAME) == UPLOAD_ATTR_VALUE
         except OSError:
           cloudlog.event("dropbox_uploader_getxattr_failed", key=key, fn=fn)
@@ -167,14 +157,6 @@ class DropboxUploader:
 
         if is_uploaded:
           continue
-
-        if metered:
-          dt = datetime.timedelta(hours=12)
-          if logdir in self.immediate_folders and (datetime.datetime.now() - datetime.datetime.fromtimestamp(ctime)) < dt:
-            continue
-
-          if name == "qcamera.ts" and not any(logdir.startswith(r.split("|")[-1]) for r in requested_routes):
-            continue
 
         yield name, key, fn
 
@@ -188,6 +170,9 @@ class DropboxUploader:
     for name, key, fn in upload_files:
       if name in self.immediate_priority:
         return name, key, fn
+
+    if upload_files:
+      return upload_files[0]
 
     return None
 
@@ -304,9 +289,6 @@ class DropboxUploader:
 
     if sz == 0:
       success = True
-    elif name in MAX_UPLOAD_SIZES and sz > MAX_UPLOAD_SIZES[name]:
-      cloudlog.event("dropbox_uploader_too_large", key=key, fn=fn, sz=sz)
-      success = True
     else:
       start_time = time.monotonic()
       stat = None
@@ -369,7 +351,8 @@ def main(exit_event: threading.Event | None = None) -> None:
     sm.update(0)
     offroad = params.get_bool("IsOffroad")
     network_type = sm["deviceState"].networkType if not force_wifi else NetworkType.wifi
-    if network_type == NetworkType.none:
+    # Dropbox uploader is intended for high-bandwidth Wi-Fi syncing only.
+    if network_type != NetworkType.wifi:
       if allow_sleep:
         time.sleep(60 if offroad else 5)
       continue
