@@ -104,6 +104,9 @@ class TogglesLayoutMici(NavWidget):
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
 
+    if not ui_state.params.get_bool("LLMAgentEnabled"):
+      ui_state.params.remove("LLMAgentAdvisory")
+
     audio_ready = ui_state.params.get_bool("LLMAgentEnabled") and ui_state.params.get_bool("LLMAgentAudioEnabled")
     self._llm_audio_trigger_btn.set_enabled(audio_ready)
     self._llm_audio_trigger_btn.set_value("tap to capture" if audio_ready else "enable llm + audio first")

@@ -276,6 +276,8 @@ class TogglesLayout(Widget):
       return
 
     self._params.put_bool(param, state)
+    if param == "LLMAgentEnabled" and not state:
+      self._params.remove("LLMAgentAdvisory")
     if self._toggle_defs[param][3]:
       self._params.put_bool("OnroadCycleRequested", True)
 

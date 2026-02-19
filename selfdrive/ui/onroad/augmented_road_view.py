@@ -118,6 +118,8 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
   def _draw_llm_advisory(self, rect: rl.Rectangle) -> None:
     if not ui_state.started:
       return
+    if not ui_state.params.get_bool("LLMAgentEnabled"):
+      return
     advisory = ui_state.llm_advisory
     if not advisory:
       return
