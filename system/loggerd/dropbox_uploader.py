@@ -370,7 +370,7 @@ def main(exit_event: threading.Event | None = None) -> None:
     now = time.monotonic()
     if (now - last_pending_count_update) >= 10.0:
       pending_count = len(list(uploader.list_upload_files(False)))
-      params.put("DropboxUploadPendingCount", str(pending_count))
+      params.put("DropboxUploadPendingCount", pending_count)
       last_pending_count_update = now
 
     network_type = sm["deviceState"].networkType if not force_wifi else NetworkType.wifi
