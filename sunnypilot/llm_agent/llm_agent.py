@@ -19,11 +19,12 @@ from openpilot.system.camerad.snapshot import extract_image
 
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions"
-OPENAI_MODEL = os.getenv("LLM_AGENT_VISION_MODEL", "gpt-5")
+OPENAI_MODEL = os.getenv("LLM_AGENT_VISION_MODEL", "gpt-4o")
 OPENAI_AUDIO_MODEL = "gpt-4o-mini-transcribe"
 OPENAI_TIMEOUT_S = 25
 OPENAI_PING_INTERVAL_S = 10
 OPENAI_AUDIO_TIMEOUT_S = 20
+OPENAI_MAX_COMPLETION_TOKENS = 256
 JPEG_MAX_SIZE = (960, 540)
 JPEG_QUALITY = 70
 LOCAL_LOG_PATH = "/data/llm-agent-test/llm_agent_runtime.log"
@@ -140,30 +141,58 @@ def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
         ],
       },
     ],
-    "max_completion_tokens": 96,
+    "max_completion_tokens": OPENAI_MAX_COMPLETION_TOKENS,
   }
+  if OPENAI_MODEL.startswith("gpt-5"):
+    payload["reasoning_effort"] = "minimal"
 
   r = requests.post(OPENAI_CHAT_URL, headers=headers, json=payload, timeout=OPENAI_TIMEOUT_S)
   if r.status_code < 200 or r.status_code >= 300:
-    return False, f"http {r.status_code}"
+    try:
+      body = r.json()
+      err = body.get("error", {})
+      msg = str(err.get("message") or err.get("code") or "").strip()
+      return False, f"http {r.status_code}: {msg[:80]}"
+    except Exception:
+      return False, f"http {r.status_code}"
 
   body = r.json()
-  content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+  choice = body.get("choices", [{}])[0]
+  content = choice.get("message", {}).get("content", "")
   content = str(content).strip().replace("\n", " ")
   if len(content) > 80:
     content = content[:80]
-  return True, content or "ok"
+  if not content:
+    finish_reason = choice.get("finish_reason", "unknown")
+    return False, f"empty response ({finish_reason})"
+  return True, content
 
 
 def _to_short_advisory(summary: str) -> str:
   text = (summary or "").strip().lower()
   normalized = text.replace("_", " ")
+  label = normalized.split(":", 1)[0].strip().upper().replace(" ", "_")
+  label_advisories = {
+    "PAVEMENT": "Pavement issue",
+    "FLOODING": "Flooding",
+    "DEBRIS": "Debris in roadway",
+    "SIGN_SIGNAL": "Sign/signal damage",
+    "GUARDRAIL": "Barrier damage",
+    "SHOULDER": "Shoulder issue",
+    "LANE_MARKING": "Marking issue",
+    "DRAINAGE": "Drainage issue",
+    "BRIDGE": "Bridge issue",
+    "WORK_ZONE": "Work zone issue",
+    "OTHER_ASSET": "Asset issue",
+  }
 
-  if not text or any(
+  if not text or text in ("ok", "okay") or any(
     k in normalized
     for k in ("no asset issue", "no road asset issue", "no agency-actionable", "no clear issue")
   ):
     return ""
+  if label in label_advisories:
+    return label_advisories[label]
   if any(k in normalized for k in ("flood", "standing water", "ponding", "high water")):
     return "Flooding"
   if any(k in normalized for k in ("debris", "downed tree", "fallen tree", "power line", "object in road")):
@@ -187,7 +216,7 @@ def _to_short_advisory(summary: str) -> str:
     for k in ("pavement", "pothole", "crack", "washout", "sinkhole", "rutting", "rough road", "broken road")
   ):
     return "Pavement issue"
-  return "Asset issue"
+  return ""
 
 
 def _capture_audio_prompt_wav(sm_audio: messaging.SubMaster) -> bytes | None:
@@ -258,6 +287,7 @@ def _to_audio_advisory(transcript: str) -> str:
 
 def main():
   params = Params()
+  params.put(ADVISORY_PARAM, "")
   sm = messaging.SubMaster(['deviceState'])
   sm_audio = messaging.SubMaster(['rawAudioData'])
   cloudlog.info("llm-agent: starting")
@@ -322,8 +352,10 @@ def main():
           _log_local(f"vision attempt networkType={network_type} routeIface={route_iface}")
           image_payload = _capture_front_camera_jpeg_b64()
           if not image_payload:
+            params.put(ADVISORY_PARAM, "")
             cloudlog.warning("llm-agent: no front camera frame available from camerad")
             _log_local("no front camera frame available from camerad")
+            _log_local("ui advisory: cleared")
           else:
             image_b64, image_size, capture_path = image_payload
             cloudlog.info(f"llm-agent: encoded frame size={image_size}B")
@@ -336,11 +368,15 @@ def main():
               _log_local(f"road summary: {detail}")
               _log_local(f"ui advisory: {advisory or 'cleared'}")
             else:
+              params.put(ADVISORY_PARAM, "")
               cloudlog.warning(f"llm-agent: OpenAI vision failed ({detail})")
               _log_local(f"OpenAI vision failed ({detail})")
+              _log_local("ui advisory: cleared")
         except Exception as e:
+          params.put(ADVISORY_PARAM, "")
           cloudlog.warning(f"llm-agent: OpenAI request error: {e}")
           _log_local(f"OpenAI request error: {e}")
+          _log_local("ui advisory: cleared")
       last_ping = now
 
     rk.keep_time()
