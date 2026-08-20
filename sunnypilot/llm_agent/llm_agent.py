@@ -19,9 +19,9 @@ from openpilot.system.camerad.snapshot import extract_image
 
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions"
-OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_MODEL = os.getenv("LLM_AGENT_VISION_MODEL", "gpt-5")
 OPENAI_AUDIO_MODEL = "gpt-4o-mini-transcribe"
-OPENAI_TIMEOUT_S = 15
+OPENAI_TIMEOUT_S = 25
 OPENAI_PING_INTERVAL_S = 10
 OPENAI_AUDIO_TIMEOUT_S = 20
 JPEG_MAX_SIZE = (960, 540)
@@ -33,6 +33,21 @@ AUDIO_ENABLED_PARAM = "LLMAgentAudioEnabled"
 AUDIO_TRIGGER_PARAM = "LLMAgentAudioTrigger"
 AUDIO_CAPTURE_SECONDS = 2.0
 AUDIO_CAPTURE_TIMEOUT_S = 8.0
+VISION_SYSTEM_PROMPT = (
+  "You are a transportation agency road asset inspector reviewing a forward-facing vehicle image. "
+  "Focus on maintenance and post-hurricane windshield-survey issues. Report only visible, "
+  "agency-actionable roadway asset conditions. Do not invent hazards; ignore normal traffic unless "
+  "it directly blocks inspection or involves road asset damage."
+)
+VISION_USER_PROMPT = (
+  "Return exactly one short sentence. If a visible road asset issue exists, start with one label "
+  "from PAVEMENT, FLOODING, DEBRIS, SIGN_SIGNAL, GUARDRAIL, SHOULDER, LANE_MARKING, DRAINAGE, "
+  "BRIDGE, WORK_ZONE, OTHER_ASSET, then describe the issue and where it appears. Prioritize storm "
+  "damage, standing water, washouts, blocked drains, downed trees or power lines, damaged signs or "
+  "signals, missing or leaning barriers, potholes, cracking, edge drop-offs, faded or blocked lane "
+  "markings, shoulder erosion, and debris. If no clear issue is visible, return "
+  "'NO_ASSET_ISSUE: no agency-actionable road asset issue visible.'"
+)
 
 
 def _log_local(message: str) -> None:
@@ -115,18 +130,17 @@ def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
     "messages": [
       {
         "role": "system",
-        "content": "You are a driving safety assistant. Be concise, factual, and road-focused.",
+        "content": VISION_SYSTEM_PROMPT,
       },
       {
         "role": "user",
         "content": [
-          {"type": "text", "text": "In exactly one sentence, start with 'Pay attention to' and describe the most relevant immediate road safety risk. If no clear risk, mention lane/traffic state briefly."},
+          {"type": "text", "text": VISION_USER_PROMPT},
           {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
         ],
       },
     ],
-    "max_tokens": 48,
-    "temperature": 0,
+    "max_completion_tokens": 96,
   }
 
   r = requests.post(OPENAI_CHAT_URL, headers=headers, json=payload, timeout=OPENAI_TIMEOUT_S)
@@ -143,26 +157,37 @@ def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
 
 def _to_short_advisory(summary: str) -> str:
   text = (summary or "").strip().lower()
-  if text.startswith("pay attention to"):
-    text = text[len("pay attention to"):].strip(" :,-.")
+  normalized = text.replace("_", " ")
 
-  if any(k in text for k in ("pedestrian", "walker", "person crossing")):
-    return "Pedestrian nearby"
-  if any(k in text for k in ("cyclist", "bicycl", "bike rider")):
-    return "Cyclist nearby"
-  if any(k in text for k in ("pothole", "rough road", "uneven road", "broken pavement")):
-    return "Pothole risk"
-  if any(k in text for k in ("obstacle", "debris", "object in road")):
-    return "Obstacle ahead"
-  if any(k in text for k in ("low visibility", "reduced visibility", "dark", "dimly lit", "fog")):
-    return "Low visibility"
-  if "lane" in text and any(k in text for k in ("unclear", "not visible", "faded", "marking")):
-    return "Lane unclear"
-  if any(k in text for k in ("vehicle ahead", "lead vehicle", "close following")):
-    return "Vehicle ahead"
-  if any(k in text for k in ("not a drivable road scene", "lack of visible road", "no visible road", "limited road context")):
-    return "Road context unclear"
-  return "Road hazard"
+  if not text or any(
+    k in normalized
+    for k in ("no asset issue", "no road asset issue", "no agency-actionable", "no clear issue")
+  ):
+    return ""
+  if any(k in normalized for k in ("flood", "standing water", "ponding", "high water")):
+    return "Flooding"
+  if any(k in normalized for k in ("debris", "downed tree", "fallen tree", "power line", "object in road")):
+    return "Debris in roadway"
+  if any(k in normalized for k in ("drain", "culvert", "inlet", "blocked grate")):
+    return "Drainage issue"
+  if any(k in normalized for k in ("sign", "signal", "traffic light", "mast arm")):
+    return "Sign/signal damage"
+  if any(k in normalized for k in ("guardrail", "barrier", "crash attenuator")):
+    return "Barrier damage"
+  if any(k in normalized for k in ("lane marking", "striping", "faded marking", "blocked marking")):
+    return "Marking issue"
+  if any(k in normalized for k in ("shoulder", "edge drop", "drop-off", "erosion")):
+    return "Shoulder issue"
+  if any(k in normalized for k in ("bridge", "overpass", "approach slab")):
+    return "Bridge issue"
+  if any(k in normalized for k in ("work zone", "cone", "barrel", "barricade")):
+    return "Work zone issue"
+  if any(
+    k in normalized
+    for k in ("pavement", "pothole", "crack", "washout", "sinkhole", "rutting", "rough road", "broken road")
+  ):
+    return "Pavement issue"
+  return "Asset issue"
 
 
 def _capture_audio_prompt_wav(sm_audio: messaging.SubMaster) -> bytes | None:
@@ -309,7 +334,7 @@ def main():
               params.put(ADVISORY_PARAM, advisory)
               cloudlog.info(f"llm-agent: road summary: {detail}")
               _log_local(f"road summary: {detail}")
-              _log_local(f"ui advisory: {advisory}")
+              _log_local(f"ui advisory: {advisory or 'cleared'}")
             else:
               cloudlog.warning(f"llm-agent: OpenAI vision failed ({detail})")
               _log_local(f"OpenAI vision failed ({detail})")
