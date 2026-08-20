@@ -248,22 +248,22 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventName.startupNoControl: {
-    ET.PERMANENT: StartupAlert("Dashcam mode"),
-    ET.NO_ENTRY: NoEntryAlert("Dashcam mode"),
+    ET.PERMANENT: StartupAlert("Road inspection mode"),
+    ET.NO_ENTRY: NoEntryAlert("Road inspection mode"),
   },
 
   EventName.startupNoCar: {
-    ET.PERMANENT: StartupAlert("Dashcam mode for unsupported car"),
+    ET.PERMANENT: StartupAlert("Road inspection mode for unsupported car"),
   },
 
   EventName.startupNoSecOcKey: {
-    ET.PERMANENT: NormalPermanentAlert("Dashcam Mode",
+    ET.PERMANENT: NormalPermanentAlert("Road Inspection Mode",
                                        "Security Key Not Available",
                                        priority=Priority.HIGH),
   },
 
   EventName.dashcamMode: {
-    ET.PERMANENT: NormalPermanentAlert("Dashcam Mode",
+    ET.PERMANENT: NormalPermanentAlert("Road Inspection Mode",
                                        priority=Priority.LOWEST),
   },
 
@@ -280,7 +280,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   # read-only mode. This can be solved by adding your fingerprint.
   # See https://github.com/commaai/openpilot/wiki/Fingerprinting for more information
   EventName.carUnrecognized: {
-    ET.PERMANENT: NormalPermanentAlert("Dashcam Mode",
+    ET.PERMANENT: NormalPermanentAlert("Road Inspection Mode",
                                        "Car Unrecognized",
                                        priority=Priority.LOWEST),
   },
