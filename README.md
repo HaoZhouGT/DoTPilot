@@ -1,7 +1,7 @@
 ![DoTPilot road inspection mode running in a vehicle](docs/assets/dotpilot-platform.jpg)
 
 ## Agency platform: DoTPilot
-**DoTPilot** is the lab's open-source in-vehicle platform for **state and county transportation agency fleets**. It runs on vehicles an agency already owns and makes each one a two-way link with the agency: an on-board AI dashcam reports roadway conditions as structured findings, while agency feeds — travel advisories, work zone data, incident reports — are delivered back to the driver as in-vehicle warnings. The post-storm damage inspection pipeline, work zone safety warnings, and traffic incident management all run on it.
+**DoTPilot** is the MOTIF lab's open-source in-vehicle platform for **state and county transportation agency fleets**. It runs on vehicles an agency already owns and makes each one a two-way link with the agency: an on-board AI dashcam reports roadway conditions as structured findings, while agency feeds — travel advisories, work zone data, incident reports — are delivered back to the driver as in-vehicle warnings. The post-storm damage inspection pipeline, work zone safety warnings, and traffic incident management all run on it.
 
 ## 💭 Join our Community Forum
 Join the official sunnypilot community forum to stay up to date with all the latest features and be a part of shaping the future of sunnypilot!
