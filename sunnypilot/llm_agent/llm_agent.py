@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import base64
 import io
-import json
 import os
 import subprocess
 import time
@@ -47,76 +46,32 @@ except AttributeError:
 LOCAL_LOG_PATH = "/data/llm-agent-test/llm_agent_runtime.log"
 CAPTURE_DIR = "/data/llm-agent-test/captures"
 ADVISORY_PARAM = "LLMAgentAdvisory"
-ROAD_INSPECTION_PARAM = "LLMRoadInspection"
 AUDIO_ENABLED_PARAM = "LLMAgentAudioEnabled"
 AUDIO_TRIGGER_PARAM = "LLMAgentAudioTrigger"
 AUDIO_CAPTURE_SECONDS = 2.0
 AUDIO_CAPTURE_TIMEOUT_S = 8.0
-ROAD_INSPECTION_SCHEMA_VERSION = 1
-MIN_DISPLAY_CONFIDENCE = 0.35
-DRIVER_DISPLAY_MAX_CHARS = 72
 VISION_SYSTEM_PROMPT = (
   "You are a transportation agency road asset inspector reviewing a forward-facing vehicle image. "
   "Focus on routine maintenance and post-hurricane windshield-survey issues. Favor recall for "
   "visible maintenance concerns that a DOT crew should review, including minor or early-stage "
-  "defects near the travel lane, shoulder, curb, or drainage path. Return JSON only. Do not invent "
-  "hazards; ignore normal traffic unless it directly blocks inspection or involves road asset damage."
+  "defects near the travel lane, shoulder, curb, or drainage path. Do not invent hazards; ignore "
+  "normal traffic unless it directly blocks inspection or involves road asset damage."
 )
 VISION_USER_PROMPT = (
   "You will receive two images from the same moment: first the full forward scene, then a lower "
   "road-surface crop emphasizing pavement, lane markings, shoulders, gutters, curbs, and drainage. "
   "Use the crop to detect small pavement and roadside asset defects while using the full image for "
-  "context. Use an FDOT Maintenance Rating Program inspired taxonomy: inspection_element must be "
-  "one of Roadway, Roadside, Traffic Services, Drainage, Vegetation/Aesthetics. Prefer categories "
-  "such as pothole, edge raveling, shoving, depression/bump, paved shoulder/turnout, joint/cracking, "
-  "rutting, pavement marking, roadway sweeping/debris, sign/object marker, guardrail/attenuator, "
-  "inlet/ditch/drain, vegetation obstruction, flooding/ponding, bridge, or work zone. Return JSON "
-  "with exactly these top-level fields: found_issue boolean, inspection_element string, "
-  "asset_feature string, damage_category string, location object with side, lane_position, and "
-  "relative_distance, severity string, confidence number 0 to 1, description string, "
-  "recommended_action string. Use ASCII text. If no clear agency-actionable asset issue is visible, "
-  "set found_issue=false, confidence<=0.34, and keep the description short."
+  "context. "
+  "Return exactly one short sentence. If a visible road asset issue exists, start with one label "
+  "from PAVEMENT, FLOODING, DEBRIS, SIGN_SIGNAL, GUARDRAIL, SHOULDER, LANE_MARKING, DRAINAGE, "
+  "BRIDGE, WORK_ZONE, OTHER_ASSET, then describe the issue and where it appears. Report likely "
+  "maintenance issues even if they are not severe. Prioritize storm damage, standing water, gutter "
+  "or curb ponding, washouts, blocked drains, downed trees or power lines, damaged signs or signals, "
+  "missing or leaning barriers, potholes, pavement patches, cracking, edge drop-offs, faded or "
+  "blocked lane markings, shoulder erosion, and debris. If the road/assets appear normal or the "
+  "image is too unclear to inspect, return "
+  "'NO_ASSET_ISSUE: no agency-actionable road asset issue visible.'"
 )
-
-INSPECTION_ELEMENTS = {
-  "roadway": "Roadway",
-  "roadside": "Roadside",
-  "traffic services": "Traffic Services",
-  "drainage": "Drainage",
-  "vegetation/aesthetics": "Vegetation/Aesthetics",
-  "vegetation / aesthetics": "Vegetation/Aesthetics",
-}
-SEVERITY_ALIASES = {
-  "low": "minor",
-  "minor": "minor",
-  "medium": "moderate",
-  "moderate": "moderate",
-  "high": "severe",
-  "severe": "severe",
-  "unknown": "unknown",
-}
-LOCATION_SIDE_ALIASES = {
-  "left": "left",
-  "left side": "left",
-  "center": "center",
-  "centre": "center",
-  "middle": "center",
-  "right": "right",
-  "right side": "right",
-  "unknown": "unknown",
-}
-RELATIVE_DISTANCE_ALIASES = {
-  "near": "near field",
-  "near field": "near field",
-  "close": "near field",
-  "mid": "mid field",
-  "middle": "mid field",
-  "mid field": "mid field",
-  "far": "far field",
-  "far field": "far field",
-  "distant": "far field",
-  "unknown": "unknown",
-}
 
 
 def _log_local(message: str) -> None:
@@ -213,154 +168,7 @@ def _capture_front_camera_jpegs_b64() -> tuple[tuple[str, int, str, tuple[int, i
   return None
 
 
-def _clean_text(value: object, max_len: int, default: str = "") -> str:
-  if value is None:
-    return default
-  text = " ".join(str(value).replace("\n", " ").split())
-  return text[:max_len] if text else default
-
-
-def _canonical_lookup(value: object, choices: dict[str, str], default: str) -> str:
-  text = _clean_text(value, 80).lower()
-  return choices.get(text, default)
-
-
-def _bool_value(value: object) -> bool:
-  if isinstance(value, bool):
-    return value
-  return _clean_text(value, 20).lower() in {"1", "true", "yes", "issue", "found"}
-
-
-def _confidence_value(value: object) -> float:
-  try:
-    confidence = float(value)
-  except (TypeError, ValueError):
-    return 0.0
-  if confidence > 1.0:
-    confidence /= 100.0
-  return max(0.0, min(confidence, 1.0))
-
-
-def _extract_json_object(content: str) -> dict[str, object] | None:
-  try:
-    data = json.loads(content)
-  except json.JSONDecodeError:
-    start = content.find("{")
-    end = content.rfind("}")
-    if start < 0 or end <= start:
-      return None
-    try:
-      data = json.loads(content[start:end + 1])
-    except json.JSONDecodeError:
-      return None
-
-  return data if isinstance(data, dict) else None
-
-
-def _driver_display(record: dict[str, object]) -> str:
-  location = record.get("location") if isinstance(record.get("location"), dict) else {}
-  lane_position = _clean_text(location.get("lane_position") if isinstance(location, dict) else "", 32)
-  side = _clean_text(location.get("side") if isinstance(location, dict) else "", 16)
-  location_text = lane_position if lane_position and lane_position != "unknown" else side
-
-  pieces = [_clean_text(record.get("damage_category"), 28, "Road issue")]
-  if location_text and location_text != "unknown":
-    pieces.append(location_text)
-  severity = _clean_text(record.get("severity"), 16)
-  if severity and severity != "unknown":
-    pieces.append(severity)
-  return _clean_text(" - ".join(pieces), DRIVER_DISPLAY_MAX_CHARS, "Road issue")
-
-
-def _empty_inspection(description: str = "") -> dict[str, object]:
-  return {
-    "schema_version": ROAD_INSPECTION_SCHEMA_VERSION,
-    "source": "llm_agent",
-    "timestamp": time.time(),
-    "found_issue": False,
-    "inspection_element": "Roadway",
-    "asset_feature": "unknown",
-    "damage_category": "None",
-    "location": {
-      "side": "unknown",
-      "lane_position": "unknown",
-      "relative_distance": "unknown",
-    },
-    "severity": "unknown",
-    "confidence": 0.0,
-    "description": description,
-    "recommended_action": "none",
-    "driver_display": "",
-    "capture": {},
-  }
-
-
-def _normalize_inspection_response(content: str, full_payload: tuple[str, int, str, tuple[int, int]],
-                                   crop_payload: tuple[str, int, str, tuple[int, int]]) -> tuple[bool, dict[str, object] | str]:
-  data = _extract_json_object(content)
-  if data is None:
-    return False, "invalid json"
-
-  found_issue = _bool_value(data.get("found_issue"))
-  confidence = _confidence_value(data.get("confidence"))
-  if confidence < MIN_DISPLAY_CONFIDENCE:
-    found_issue = False
-
-  location_src = data.get("location") if isinstance(data.get("location"), dict) else {}
-  location = {
-    "side": _canonical_lookup(location_src.get("side") if isinstance(location_src, dict) else None, LOCATION_SIDE_ALIASES, "unknown"),
-    "lane_position": _clean_text(location_src.get("lane_position") if isinstance(location_src, dict) else None, 48, "unknown"),
-    "relative_distance": _canonical_lookup(
-      location_src.get("relative_distance") if isinstance(location_src, dict) else None,
-      RELATIVE_DISTANCE_ALIASES,
-      "unknown",
-    ),
-  }
-
-  _, full_size, full_path, full_dims = full_payload
-  _, crop_size, crop_path, crop_dims = crop_payload
-  record: dict[str, object] = {
-    "schema_version": ROAD_INSPECTION_SCHEMA_VERSION,
-    "source": "llm_agent",
-    "timestamp": time.time(),
-    "found_issue": found_issue,
-    "inspection_element": _canonical_lookup(data.get("inspection_element"), INSPECTION_ELEMENTS, "Roadway"),
-    "asset_feature": _clean_text(data.get("asset_feature"), 64, "unknown"),
-    "damage_category": _clean_text(data.get("damage_category"), 40, "Road issue" if found_issue else "None"),
-    "location": location,
-    "severity": _canonical_lookup(data.get("severity"), SEVERITY_ALIASES, "unknown"),
-    "confidence": confidence,
-    "description": _clean_text(data.get("description"), 160),
-    "recommended_action": _clean_text(data.get("recommended_action"), 80, "human verification" if found_issue else "none"),
-    "driver_display": "",
-    "capture": {
-      "full_path": full_path,
-      "full_image_size_bytes": full_size,
-      "full_dimensions": list(full_dims),
-      "crop_path": crop_path,
-      "crop_image_size_bytes": crop_size,
-      "crop_dimensions": list(crop_dims),
-    },
-  }
-  record["driver_display"] = _driver_display(record) if found_issue else ""
-  return True, record
-
-
-def _update_road_inspection(params: Params, inspection: dict[str, object] | None, active_inspection: dict[str, object] | None,
-                            inspection_expiry: float, now: float) -> tuple[dict[str, object] | None, float]:
-  if inspection and inspection.get("found_issue"):
-    params.put(ROAD_INSPECTION_PARAM, inspection)
-    return inspection, now + ADVISORY_HOLD_S
-
-  if active_inspection and now < inspection_expiry:
-    params.put(ROAD_INSPECTION_PARAM, active_inspection)
-    return active_inspection, inspection_expiry
-
-  params.put(ROAD_INSPECTION_PARAM, inspection or _empty_inspection())
-  return None, 0.0
-
-
-def _openai_vision_inspect(api_key: str, image_payloads: tuple[tuple[str, int, str, tuple[int, int]], ...]) -> tuple[bool, dict[str, object] | str]:
+def _openai_vision_describe(api_key: str, image_payloads: tuple[tuple[str, int, str, tuple[int, int]], ...]) -> tuple[bool, str]:
   headers = {
     "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json",
@@ -382,7 +190,6 @@ def _openai_vision_inspect(api_key: str, image_payloads: tuple[tuple[str, int, s
       },
     ],
     "max_completion_tokens": OPENAI_MAX_COMPLETION_TOKENS,
-    "response_format": {"type": "json_object"},
   }
   if OPENAI_MODEL.startswith("gpt-5"):
     payload["reasoning_effort"] = "minimal"
@@ -400,12 +207,77 @@ def _openai_vision_inspect(api_key: str, image_payloads: tuple[tuple[str, int, s
   body = r.json()
   choice = body.get("choices", [{}])[0]
   content = choice.get("message", {}).get("content", "")
+  content = str(content).strip().replace("\n", " ")
+  if len(content) > 80:
+    content = content[:80]
   if not content:
     finish_reason = choice.get("finish_reason", "unknown")
     return False, f"empty response ({finish_reason})"
-  if len(image_payloads) < 2:
-    return False, "missing image payload"
-  return _normalize_inspection_response(str(content).strip(), image_payloads[0], image_payloads[1])
+  return True, content
+
+
+def _to_short_advisory(summary: str) -> str:
+  text = (summary or "").strip().lower()
+  normalized = text.replace("_", " ")
+  label = normalized.split(":", 1)[0].strip().upper().replace(" ", "_")
+  label_advisories = {
+    "PAVEMENT": "Pavement issue",
+    "FLOODING": "Flooding",
+    "DEBRIS": "Debris in roadway",
+    "SIGN_SIGNAL": "Sign/signal damage",
+    "GUARDRAIL": "Barrier damage",
+    "SHOULDER": "Shoulder issue",
+    "LANE_MARKING": "Marking issue",
+    "DRAINAGE": "Drainage issue",
+    "BRIDGE": "Bridge issue",
+    "WORK_ZONE": "Work zone issue",
+    "OTHER_ASSET": "Asset issue",
+  }
+
+  if not text or text in ("ok", "okay") or any(
+    k in normalized
+    for k in ("no asset issue", "no road asset issue", "no agency-actionable", "no clear issue")
+  ):
+    return ""
+  if label in label_advisories:
+    return label_advisories[label]
+  if any(k in normalized for k in ("flood", "standing water", "ponding", "high water")):
+    return "Flooding"
+  if any(k in normalized for k in ("debris", "downed tree", "fallen tree", "power line", "object in road")):
+    return "Debris in roadway"
+  if any(k in normalized for k in ("drain", "culvert", "inlet", "blocked grate")):
+    return "Drainage issue"
+  if any(k in normalized for k in ("sign", "signal", "traffic light", "mast arm")):
+    return "Sign/signal damage"
+  if any(k in normalized for k in ("guardrail", "barrier", "crash attenuator")):
+    return "Barrier damage"
+  if any(k in normalized for k in ("lane marking", "striping", "faded marking", "blocked marking")):
+    return "Marking issue"
+  if any(k in normalized for k in ("shoulder", "edge drop", "drop-off", "erosion")):
+    return "Shoulder issue"
+  if any(k in normalized for k in ("bridge", "overpass", "approach slab")):
+    return "Bridge issue"
+  if any(k in normalized for k in ("work zone", "cone", "barrel", "barricade")):
+    return "Work zone issue"
+  if any(
+    k in normalized
+    for k in ("pavement", "pothole", "crack", "washout", "sinkhole", "rutting", "rough road", "broken road")
+  ):
+    return "Pavement issue"
+  return ""
+
+
+def _update_advisory(params: Params, advisory: str, active_advisory: str, advisory_expiry: float, now: float) -> tuple[str, float]:
+  if advisory:
+    params.put(ADVISORY_PARAM, advisory)
+    return advisory, now + ADVISORY_HOLD_S
+
+  if active_advisory and now < advisory_expiry:
+    params.put(ADVISORY_PARAM, active_advisory)
+    return active_advisory, advisory_expiry
+
+  params.put(ADVISORY_PARAM, "")
+  return "", 0.0
 
 
 def _capture_audio_prompt_wav(sm_audio: messaging.SubMaster) -> bytes | None:
@@ -477,7 +349,6 @@ def _to_audio_advisory(transcript: str) -> str:
 def main():
   params = Params()
   params.put(ADVISORY_PARAM, "")
-  params.put(ROAD_INSPECTION_PARAM, _empty_inspection("not inspected yet"))
   sm = messaging.SubMaster(['deviceState'])
   sm_audio = messaging.SubMaster(['rawAudioData'])
   cloudlog.info("llm-agent: starting")
@@ -485,8 +356,8 @@ def main():
   last_heartbeat = 0.0
   last_ping = 0.0
   warned_no_key = False
-  active_inspection: dict[str, object] | None = None
-  inspection_expiry = 0.0
+  active_advisory = ""
+  advisory_expiry = 0.0
 
   while True:
     sm.update(0)
@@ -544,12 +415,12 @@ def main():
           _log_local(f"vision attempt networkType={network_type} routeIface={route_iface}")
           image_payloads = _capture_front_camera_jpegs_b64()
           if not image_payloads:
-            active_inspection, inspection_expiry = _update_road_inspection(
-              params, None, active_inspection, inspection_expiry, now
+            active_advisory, advisory_expiry = _update_advisory(
+              params, "", active_advisory, advisory_expiry, now
             )
             cloudlog.warning("llm-agent: no front camera frame available from camerad")
             _log_local("no front camera frame available from camerad")
-            _log_local("road inspection: held" if active_inspection else "road inspection: cleared")
+            _log_local(f"ui advisory: {active_advisory or 'cleared'}")
           else:
             full_payload, crop_payload = image_payloads
             _, full_size, full_path, full_dims = full_payload
@@ -558,35 +429,32 @@ def main():
             _log_local(f"encoded frame size={full_size}B dims={full_dims[0]}x{full_dims[1]} capture={full_path}")
             _log_local(f"encoded road crop size={crop_size}B dims={crop_dims[0]}x{crop_dims[1]} capture={crop_path}")
             request_start = time.monotonic()
-            ok, detail = _openai_vision_inspect(api_key, image_payloads)
+            ok, detail = _openai_vision_describe(api_key, image_payloads)
             request_elapsed = time.monotonic() - request_start
             response_now = time.monotonic()
             _log_local(f"vision response model={OPENAI_MODEL} elapsed={request_elapsed:.2f}s ok={ok}")
             if ok:
-              assert isinstance(detail, dict)
-              active_inspection, inspection_expiry = _update_road_inspection(
-                params, detail, active_inspection, inspection_expiry, response_now
+              advisory = _to_short_advisory(detail)
+              active_advisory, advisory_expiry = _update_advisory(
+                params, advisory, active_advisory, advisory_expiry, response_now
               )
-              params.put(ADVISORY_PARAM, "")
-              if detail.get("found_issue"):
-                cloudlog.info(f"llm-agent: road issue: {detail.get('driver_display')}")
-              else:
-                cloudlog.info("llm-agent: no road maintenance issue found")
-              _log_local(f"road inspection: {json.dumps(detail, sort_keys=True)}")
+              cloudlog.info(f"llm-agent: road summary: {detail}")
+              _log_local(f"road summary: {detail}")
+              _log_local(f"ui advisory: {active_advisory or 'cleared'}")
             else:
-              active_inspection, inspection_expiry = _update_road_inspection(
-                params, None, active_inspection, inspection_expiry, response_now
+              active_advisory, advisory_expiry = _update_advisory(
+                params, "", active_advisory, advisory_expiry, response_now
               )
               cloudlog.warning(f"llm-agent: OpenAI vision failed ({detail})")
               _log_local(f"OpenAI vision failed ({detail})")
-              _log_local("road inspection: held" if active_inspection else "road inspection: cleared")
+              _log_local(f"ui advisory: {active_advisory or 'cleared'}")
         except Exception as e:
-          active_inspection, inspection_expiry = _update_road_inspection(
-            params, None, active_inspection, inspection_expiry, now
+          active_advisory, advisory_expiry = _update_advisory(
+            params, "", active_advisory, advisory_expiry, now
           )
           cloudlog.warning(f"llm-agent: OpenAI request error: {e}")
           _log_local(f"OpenAI request error: {e}")
-          _log_local("road inspection: held" if active_inspection else "road inspection: cleared")
+          _log_local(f"ui advisory: {active_advisory or 'cleared'}")
       last_ping = now
 
     rk.keep_time()

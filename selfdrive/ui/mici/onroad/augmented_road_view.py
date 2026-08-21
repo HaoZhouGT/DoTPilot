@@ -11,7 +11,6 @@ from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
-from openpilot.selfdrive.ui.onroad.road_inspection_overlay import RoadInspectionOverlay
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, MouseEvent
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets import Widget
@@ -164,11 +163,11 @@ class AugmentedRoadView(CameraView):
     self._alert_renderer = AlertRenderer()
     self._driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall()
-    self._road_inspection_overlay = RoadInspectionOverlay()
     self._offroad_label = UnifiedLabel("start the car to\nuse sunnypilot", 54, FontWeight.DISPLAY,
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                        alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
+    self._llm_advisory_font = gui_app.font(FontWeight.BOLD)
 
     self._fade_texture = gui_app.texture("icons_mici/onroad/onroad_fade.png")
     self._fade_alpha_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
@@ -246,7 +245,7 @@ class AugmentedRoadView(CameraView):
     if ui_state.started:
       self._alert_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)
-    self._road_inspection_overlay.render(self._content_rect)
+    self._draw_llm_advisory(self._content_rect)
 
     # Draw fake rounded border
     rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, rl.BLACK)
@@ -269,6 +268,37 @@ class AugmentedRoadView(CameraView):
     msg = messaging.new_message('uiDebug')
     msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
     self._pm.send('uiDebug', msg)
+
+  def _draw_llm_advisory(self, rect: rl.Rectangle) -> None:
+    if not ui_state.started:
+      return
+    if not ui_state.params.get_bool("LLMAgentEnabled"):
+      return
+    advisory = ui_state.llm_advisory
+    if not advisory:
+      return
+
+    max_len = 72
+    if len(advisory) > max_len:
+      advisory = advisory[:max_len - 3].rstrip() + "..."
+
+    font_size = 34
+    x = rect.x + 24
+    y = rect.y + 72
+    max_width = rect.x + rect.width - x - 24
+    while advisory and rl.measure_text_ex(self._llm_advisory_font, advisory, font_size, 0).x > max_width:
+      if len(advisory) <= 3:
+        advisory = ""
+        break
+      advisory = advisory[:-4].rstrip() + "..."
+    if not advisory:
+      return
+
+    pos = rl.Vector2(x, y)
+    for dx, dy in ((2, 2), (1, 1)):
+      rl.draw_text_ex(self._llm_advisory_font, advisory, rl.Vector2(pos.x + dx, pos.y + dy), font_size, 0,
+                      rl.Color(0, 0, 0, 190))
+    rl.draw_text_ex(self._llm_advisory_font, advisory, pos, font_size, 0, rl.Color(255, 235, 235, 235))
 
   def _switch_stream_if_needed(self, sm):
     if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
