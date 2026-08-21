@@ -16,7 +16,7 @@ from openpilot.sunnypilot.sunnylink.utils import sunnylink_need_register, sunnyl
 WEBCAM = os.getenv("USE_WEBCAM") is not None
 
 def driverview(started: bool, params: Params, CP: car.CarParams) -> bool:
-  return started or params.get_bool("IsDriverViewEnabled")
+  return started or params.get_bool("IsDriverViewEnabled") or params.get_bool("ForceOnroadMode")
 
 def notcar(started: bool, params: Params, CP: car.CarParams) -> bool:
   return started and CP.notCar

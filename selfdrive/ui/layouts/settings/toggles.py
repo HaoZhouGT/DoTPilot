@@ -39,7 +39,7 @@ DESCRIPTIONS = {
   "IsMetric": tr_noop("Display speed in km/h instead of mph."),
   "RecordAudio": tr_noop("Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect."),
   "ForceOnroadMode": tr_noop(
-    "For testing only. Forces onroad mode without ignition so camera and onroad daemons run."
+    "For testing only. Shows the onroad camera UI without ignition, but does not start driving controls."
   ),
 }
 
@@ -107,7 +107,7 @@ class TogglesLayout(Widget):
         True,
       ),
       "ForceOnroadMode": (
-        lambda: tr("Force Onroad Mode (Test)"),
+        lambda: tr("Force Onroad UI (Test)"),
         DESCRIPTIONS["ForceOnroadMode"],
         "warning.png",
         False,
@@ -238,6 +238,8 @@ class TogglesLayout(Widget):
     for toggle_def in self._toggle_defs:
       if self._toggle_defs[toggle_def][3] and toggle_def not in self._locked_toggles:
         self._toggles[toggle_def].action_item.set_enabled(not ui_state.engaged)
+
+    self._toggles["ForceOnroadMode"].action_item.set_enabled(not ui_state.engaged)
 
     if hasattr(self, "_audio_trigger_btn"):
       enabled = self._params.get_bool("LLMAgentEnabled") and self._params.get_bool("LLMAgentAudioEnabled")
