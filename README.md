@@ -1,7 +1,34 @@
-![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
+# DoTPilot llm-agent Branch
 
-## 🌞 What is sunnypilot?
-[sunnypilot](https://github.com/sunnyhaibin/sunnypilot) is a fork of comma.ai's openpilot, an open source driver assistance system. sunnypilot offers the user a unique driving experience for over 300+ supported car makes and models with modified behaviors of driving assist engagements. sunnypilot complies with comma.ai's safety rules as accurately as possible.
+This branch carries the active road asset inspection work for DoTPilot. It builds on [sunnypilot](https://github.com/sunnyhaibin/sunnypilot), itself a fork of comma.ai's openpilot, and adds a managed `llm-agent` process for DOT-style windshield surveys.
+
+The agent is advisory. It reports maintenance findings to the onroad UI and logs debugging artifacts, but it does not directly control steering, throttle, or brakes.
+
+## Branch Focus
+
+`llm-agent` captures the forward camera through VisionIPC, creates both a full-scene image and a road-surface crop, sends the images to an OpenAI vision model, and publishes a concise `LLMAgentAdvisory` string for the onroad maintenance-finding panel. Current prompts target pavement damage, standing water, drainage issues, debris, shoulder erosion, faded lane markings, damaged signs/signals, guardrail damage, bridge issues, and work zones.
+
+```bash
+echo -n "1" > /data/params/d/LLMAgentEnabled
+echo -n "sk-..." > /data/params/d/AgentApiKey
+```
+
+Runtime artifacts are kept under `/data/llm-agent-test/`, including `llm_agent_runtime.log` and captured JPEGs in `captures/`. The default vision model is `gpt-4o`; `LLM_AGENT_VISION_MODEL`, `LLM_AGENT_VISION_INTERVAL_S`, and `LLM_AGENT_ADVISORY_HOLD_S` can override the model, polling interval, and display hold time.
+
+## Audio Prompt Experiment
+
+This branch also includes optional one-shot audio prompt capture:
+
+```bash
+echo -n "1" > /data/params/d/LLMAgentAudioEnabled
+echo -n "1" > /data/params/d/LLMAgentAudioTrigger
+```
+
+The trigger captures one short microphone sample, transcribes it with `gpt-4o-mini-transcribe`, and publishes a brief acknowledgement or advisory. Use this only in controlled development workflows.
+
+## Related Branches
+
+Use `v2x-traffic-advisor-f511` for the structured `LLMRoadInspection` JSON path plus FL511 `TrafficAdvisory` rendering. Use `llm-agent-force-onroad` for bench testing with Force Onroad Mode and audio prompt experiments.
 
 ## 💭 Join our Community Forum
 Join the official sunnypilot community forum to stay up to date with all the latest features and be a part of shaping the future of sunnypilot!
@@ -22,6 +49,8 @@ We welcome both pull requests and issues on GitHub. Bug fixes are encouraged.
 Pull requests should be against the most current `master` branch.
 
 ## 📊 User Data
+
+When enabled, this branch can send forward-camera JPEGs and road-surface crops to the configured OpenAI backend. Audio prompt experiments can send short microphone captures for transcription. Base sunnypilot/comma logging behavior still applies.
 
 By default, sunnypilot uploads the driving data to comma servers. You can also access your data through [comma connect](https://connect.comma.ai/).
 
