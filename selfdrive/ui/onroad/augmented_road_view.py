@@ -138,18 +138,33 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     value_size = 36
     detail_size = 29
     row_h = 47
-    panel_h = 74 + row_h * len(rows) + 18
+    label_col_w = min(174, panel_w * 0.30)
+    inner_x = (rect.x + (rect.width - panel_w) / 2) + 36
+    value_x = inner_x + label_col_w
+    value_w = max(0, int(rect.x + (rect.width + panel_w) / 2 - value_x - 24))
+    render_rows = []
+    for label, value in rows:
+      if label == "DETAIL":
+        value_lines = self._wrap_llm_text(self._font_bold, value, detail_size, value_w, 2)
+        row_height = row_h + max(0, len(value_lines) - 1) * (detail_size + 4)
+      else:
+        value_lines = [self._fit_llm_text(self._font_bold, value, value_size, value_w)]
+        row_height = row_h
+      render_rows.append((label, value_lines, row_height))
+
+    panel_h = 74 + sum(row[2] for row in render_rows) + 18
     x = rect.x + (rect.width - panel_w) / 2
     y = rect.y + (rect.height - panel_h) * 0.42
     panel = rl.Rectangle(x, y, panel_w, panel_h)
 
-    bg = rl.Color(6, 12, 16, 212)
-    border = rl.Color(255, 186, 55, 230)
-    accent = rl.Color(255, 205, 68, 245)
+    bg = rl.Color(6, 12, 16, 164)
+    border = rl.Color(255, 186, 55, 215)
+    accent = rl.Color(255, 205, 68, 235)
     label_color = rl.Color(143, 218, 235, 235)
     value_color = rl.Color(255, 255, 245, 245)
     detail_color = rl.Color(232, 240, 244, 235)
 
+    rl.draw_rectangle_rounded(rl.Rectangle(x + 4, y + 4, panel_w, panel_h), 0.08, 8, rl.Color(0, 0, 0, 78))
     rl.draw_rectangle_rounded(panel, 0.08, 8, bg)
     rl.draw_rectangle_rounded_lines_ex(panel, 0.08, 8, 3, border)
     rl.draw_rectangle(int(x + 14), int(y + 16), 7, int(panel_h - 32), accent)
@@ -159,16 +174,16 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
                                  rl.Vector2(inner_x, y + 16), header_size, accent)
 
     row_y = y + 60
-    label_col_w = min(174, panel_w * 0.30)
     value_x = inner_x + label_col_w
     value_w = max(0, int(x + panel_w - value_x - 24))
-    for label, value in rows:
+    for label, value_lines, row_height in render_rows:
       value_font_size = detail_size if label == "DETAIL" else value_size
-      value = self._fit_llm_text(self._font_bold, value, value_font_size, value_w)
       self._draw_shadowed_llm_text(self._font_medium, label, rl.Vector2(inner_x, row_y + 7), label_size, label_color)
-      self._draw_shadowed_llm_text(self._font_bold, value, rl.Vector2(value_x, row_y), value_font_size,
-                                   detail_color if label == "DETAIL" else value_color)
-      row_y += row_h
+      for line_index, value_line in enumerate(value_lines):
+        line_y = row_y + line_index * (value_font_size + 4)
+        self._draw_shadowed_llm_text(self._font_bold, value_line, rl.Vector2(value_x, line_y), value_font_size,
+                                     detail_color if label == "DETAIL" else value_color)
+      row_y += row_height
 
   def _llm_inspection_rows(self, advisory: str) -> list[tuple[str, str]]:
     fields = {}
@@ -205,6 +220,31 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     while len(text) > 3 and rl.measure_text_ex(font, text + "...", font_size, 0).x > max_width:
       text = text[:-1].rstrip()
     return f"{text}..." if text else ""
+
+  def _wrap_llm_text(self, font: rl.Font, text: str, font_size: int, max_width: int, max_lines: int) -> list[str]:
+    text = " ".join(text.replace("\n", " ").split())
+    if max_width <= 0 or not text:
+      return [""]
+
+    words = text.split()
+    lines = []
+    while words and len(lines) < max_lines:
+      line = ""
+      while words:
+        candidate = words[0] if not line else f"{line} {words[0]}"
+        if rl.measure_text_ex(font, candidate, font_size, 0).x <= max_width:
+          line = candidate
+          words.pop(0)
+        else:
+          break
+
+      if not line:
+        line = self._fit_llm_text(font, words.pop(0), font_size, max_width)
+      lines.append(line)
+
+    if words and lines:
+      lines[-1] = self._fit_llm_text(font, f"{lines[-1]}...", font_size, max_width)
+    return lines or [""]
 
   def _draw_shadowed_llm_text(self, font: rl.Font, text: str, pos: rl.Vector2, font_size: int, color: rl.Color) -> None:
     if not text:
