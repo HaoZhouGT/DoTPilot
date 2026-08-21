@@ -10,7 +10,8 @@ from openpilot.selfdrive.ui.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.onroad.cameraview import CameraView
-from openpilot.system.ui.lib.application import gui_app, FontWeight
+from openpilot.selfdrive.ui.onroad.road_inspection_overlay import RoadInspectionOverlay
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
 
@@ -56,8 +57,7 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     self._hud_renderer = HudRenderer()
     self.alert_renderer = AlertRenderer()
     self.driver_state_renderer = DriverStateRenderer()
-    self._font_medium = gui_app.font(FontWeight.MEDIUM)
-    self._font_bold = gui_app.font(FontWeight.BOLD)
+    self._road_inspection_overlay = RoadInspectionOverlay(avoid_left_hud=True)
 
     # debug
     self._pm = messaging.PubMaster(['uiDebug'])
@@ -97,9 +97,11 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     self.model_renderer.render(self._content_rect)
     AugmentedRoadViewSP.update_fade_out_bottom_overlay(self, self._content_rect)
     self._hud_renderer.render(self._content_rect)
+    has_alert = self.alert_renderer.get_alert(ui_state.sm) is not None
     self.alert_renderer.render(self._content_rect)
     self.driver_state_renderer.render(self._content_rect)
-    self._draw_llm_advisory(self._content_rect)
+    if not has_alert:
+      self._road_inspection_overlay.render(self._content_rect)
 
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds
@@ -114,34 +116,6 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     msg = messaging.new_message('uiDebug')
     msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
     self._pm.send('uiDebug', msg)
-
-  def _draw_llm_advisory(self, rect: rl.Rectangle) -> None:
-    if not ui_state.started:
-      return
-    if not ui_state.params.get_bool("LLMAgentEnabled"):
-      return
-    advisory = ui_state.llm_advisory
-    if not advisory:
-      return
-
-    max_len = 24
-    if len(advisory) > max_len:
-      advisory = advisory[:max_len - 1].rstrip() + "…"
-    advisory = advisory.upper()
-
-    font_size = 70
-    text_size = rl.measure_text_ex(self._font_bold, advisory, font_size, 0)
-    pad_x, pad_y = 36, 18
-    box_w = max(text_size.x + pad_x * 2, rect.width * 0.42)
-    box_h = text_size.y + pad_y * 2
-    box_w = min(box_w, rect.width * 0.56)
-    box_x = rect.x + (rect.width - box_w) / 2
-    box_y = rect.y + (rect.height - box_h) / 2
-
-    rl.draw_rectangle_rounded(rl.Rectangle(box_x, box_y, box_w, box_h), 0.22, 8, rl.Color(45, 0, 0, 220))
-    rl.draw_rectangle_rounded_lines_ex(rl.Rectangle(box_x, box_y, box_w, box_h), 0.22, 8, 3, rl.Color(255, 80, 80, 255))
-    text_pos = rl.Vector2(box_x + (box_w - text_size.x) / 2, box_y + pad_y)
-    rl.draw_text_ex(self._font_bold, advisory, text_pos, font_size, 0, rl.Color(255, 235, 235, 255))
 
   def _handle_mouse_press(self, _):
     if not self._hud_renderer.user_interacting() and self._click_callback is not None:

@@ -11,6 +11,7 @@ from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
+from openpilot.selfdrive.ui.onroad.road_inspection_overlay import RoadInspectionOverlay
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, MouseEvent
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets import Widget
@@ -163,14 +164,11 @@ class AugmentedRoadView(CameraView):
     self._alert_renderer = AlertRenderer()
     self._driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall()
+    self._road_inspection_overlay = RoadInspectionOverlay()
     self._offroad_label = UnifiedLabel("start the car to\nuse sunnypilot", 54, FontWeight.DISPLAY,
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                        alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
-    self._llm_advisory_label = UnifiedLabel("", 66, FontWeight.BOLD,
-                                            text_color=rl.Color(255, 235, 235, 255),
-                                            alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
-                                            alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
 
     self._fade_texture = gui_app.texture("icons_mici/onroad/onroad_fade.png")
     self._fade_alpha_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
@@ -248,7 +246,8 @@ class AugmentedRoadView(CameraView):
     if ui_state.started:
       self._alert_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)
-    self._draw_llm_advisory(self._content_rect)
+    if alert_to_render is None:
+      self._road_inspection_overlay.render(self._content_rect)
 
     # Draw fake rounded border
     rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, rl.BLACK)
@@ -271,30 +270,6 @@ class AugmentedRoadView(CameraView):
     msg = messaging.new_message('uiDebug')
     msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
     self._pm.send('uiDebug', msg)
-
-  def _draw_llm_advisory(self, rect: rl.Rectangle) -> None:
-    if not ui_state.started:
-      return
-    if not ui_state.params.get_bool("LLMAgentEnabled"):
-      return
-    advisory = ui_state.llm_advisory
-    if not advisory:
-      return
-
-    max_len = 24
-    if len(advisory) > max_len:
-      advisory = advisory[:max_len - 1].rstrip() + "…"
-    advisory = advisory.upper()
-
-    label_h = 112
-    label_w = min(rect.width * 0.56, 860)
-    label_x = rect.x + (rect.width - label_w) / 2
-    label_y = rect.y + (rect.height - label_h) / 2
-
-    self._llm_advisory_label.set_text(advisory)
-    rl.draw_rectangle_rounded(rl.Rectangle(label_x, label_y, label_w, label_h), 0.22, 8, rl.Color(45, 0, 0, 220))
-    rl.draw_rectangle_rounded_lines_ex(rl.Rectangle(label_x, label_y, label_w, label_h), 0.22, 8, 3, rl.Color(255, 80, 80, 255))
-    self._llm_advisory_label.render(rl.Rectangle(label_x, label_y + 6, label_w, label_h))
 
   def _switch_stream_if_needed(self, sm):
     if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
