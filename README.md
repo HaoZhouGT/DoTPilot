@@ -1,7 +1,33 @@
-![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
+# DoTPilot llm-agent-force-onroad Branch
 
-## 🌞 What is sunnypilot?
-[sunnypilot](https://github.com/sunnyhaibin/sunnypilot) is a fork of comma.ai's openpilot, an open source driver assistance system. sunnypilot offers the user a unique driving experience for over 300+ supported car makes and models with modified behaviors of driving assist engagements. sunnypilot complies with comma.ai's safety rules as accurately as possible.
+This branch is a bench and UI testing branch for DoTPilot's LLM road-scene assistant. It builds on [sunnypilot](https://github.com/sunnyhaibin/sunnypilot), itself a fork of comma.ai's openpilot, and collects the Force Onroad Mode, audio prompt, and FL511 incidents experiments used while developing the agent UI.
+
+The branch is advisory and experimental. It is meant for development workflows, not production driving.
+
+## Branch Focus
+
+Recent work on this branch includes `ForceOnroadMode` for lab checks, `LLMAgentEnabled` for the managed `llm-agent` process, `LLMAgentAdvisory` for the onroad LLM advisory panel, `LLMAgentAudioEnabled` and `LLMAgentAudioTrigger` for one-shot microphone prompt capture, `system.micd` in driverview, and `sunnypilot/llm_agent/fl511_tool.py` for FL511 incident summaries when `FL511ApiKey` is configured.
+
+```bash
+echo -n "1" > /data/params/d/LLMAgentEnabled
+echo -n "sk-..." > /data/params/d/AgentApiKey
+echo -n "1" > /data/params/d/LLMAgentAudioEnabled
+echo -n "1" > /data/params/d/LLMAgentAudioTrigger
+```
+
+Optional FL511 helper:
+
+```bash
+echo -n "your-fl511-key" > /data/params/d/FL511ApiKey
+```
+
+Force Onroad Mode is for bench testing only:
+
+```bash
+echo -n "1" > /data/params/d/ForceOnroadMode
+```
+
+Do not use Force Onroad Mode for public-road driving.
 
 ## 💭 Join our Community Forum
 Join the official sunnypilot community forum to stay up to date with all the latest features and be a part of shaping the future of sunnypilot!
@@ -22,6 +48,8 @@ We welcome both pull requests and issues on GitHub. Bug fixes are encouraged.
 Pull requests should be against the most current `master` branch.
 
 ## 📊 User Data
+
+When enabled, this branch can send forward-camera images to the configured OpenAI backend. Audio prompt experiments can send a short microphone capture for transcription. The FL511 helper fetches incident data from FL511 using the configured key.
 
 By default, sunnypilot uploads the driving data to comma servers. You can also access your data through [comma connect](https://connect.comma.ai/).
 
