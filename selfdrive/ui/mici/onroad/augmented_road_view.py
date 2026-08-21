@@ -283,62 +283,65 @@ class AugmentedRoadView(CameraView):
     if not rows:
       return
 
-    panel_w = min(740, max(420, int(rect.width * 0.58)))
+    panel_w = min(820, max(500, int(rect.width * 0.62)))
     panel_w = min(panel_w, int(rect.width - 64))
     if panel_w <= 0:
       return
 
-    header_size = 28
-    label_size = 21
-    value_size = 34
-    detail_size = 27
-    row_h = 44
-    label_col_w = min(164, panel_w * 0.30)
-    inner_x = (rect.x + (rect.width - panel_w) / 2) + 34
-    value_x = inner_x + label_col_w
-    value_w = max(0, int(rect.x + (rect.width + panel_w) / 2 - value_x - 22))
-    render_rows = []
-    for label, value in rows:
-      if label == "DETAIL":
-        value_lines = self._wrap_llm_text(self._llm_advisory_font, value, detail_size, value_w, 2)
-        row_height = row_h + max(0, len(value_lines) - 1) * (detail_size + 4)
-      else:
-        value_lines = [self._fit_llm_text(self._llm_advisory_font, value, value_size, value_w)]
-        row_height = row_h
-      render_rows.append((label, value_lines, row_height))
+    fields = {label: value for label, value in rows}
+    header_size = 24
+    category_size = 38
+    label_size = 20
+    info_size = 28
+    detail_size = 25
+    text_gap = 5
+    inner_pad_x = 40
+    inner_w = max(0, int(panel_w - inner_pad_x * 2))
+    category = self._fit_llm_text(self._llm_advisory_font, fields.get("CATEGORY", "Road asset issue").upper(),
+                                  category_size, inner_w)
+    location_lines = self._wrap_llm_text(self._llm_advisory_font, fields.get("LOCATION", "roadway"), info_size, inner_w, 1)
+    detail_lines = self._wrap_llm_text(self._llm_advisory_font, fields.get("DETAIL", "field verification recommended"),
+                                       detail_size, inner_w, 2)
 
-    panel_h = 70 + sum(row[2] for row in render_rows) + 16
+    panel_h = (20 + header_size + 8 + category_size + 13 + label_size + 4 +
+               len(location_lines) * (info_size + text_gap) + 9 + label_size + 4 +
+               len(detail_lines) * (detail_size + text_gap) + 16)
     x = rect.x + (rect.width - panel_w) / 2
     y = rect.y + (rect.height - panel_h) * 0.42
     panel = rl.Rectangle(x, y, panel_w, panel_h)
 
-    bg = rl.Color(6, 12, 16, 164)
-    border = rl.Color(255, 186, 55, 215)
+    bg = rl.Color(6, 12, 16, 132)
+    border = rl.Color(255, 186, 55, 205)
     accent = rl.Color(255, 205, 68, 235)
-    label_color = rl.Color(143, 218, 235, 235)
+    label_color = rl.Color(200, 222, 224, 225)
     value_color = rl.Color(255, 255, 245, 245)
     detail_color = rl.Color(232, 240, 244, 235)
 
-    rl.draw_rectangle_rounded(rl.Rectangle(x + 4, y + 4, panel_w, panel_h), 0.08, 8, rl.Color(0, 0, 0, 78))
+    rl.draw_rectangle_rounded(rl.Rectangle(x + 4, y + 4, panel_w, panel_h), 0.08, 8, rl.Color(0, 0, 0, 62))
     rl.draw_rectangle_rounded(panel, 0.08, 8, bg)
     rl.draw_rectangle_rounded_lines_ex(panel, 0.08, 8, 3, border)
     rl.draw_rectangle(int(x + 14), int(y + 16), 7, int(panel_h - 32), accent)
 
-    inner_x = x + 34
-    self._draw_shadowed_llm_text(self._llm_advisory_font, "ROAD INSPECTION FINDING",
-                                 rl.Vector2(inner_x, y + 15), header_size, accent)
+    inner_x = x + inner_pad_x
+    cursor_y = y + 17
+    self._draw_shadowed_llm_text(self._llm_advisory_meta_font, "MAINTENANCE FINDING",
+                                 rl.Vector2(inner_x, cursor_y), header_size, accent)
+    cursor_y += header_size + 8
+    self._draw_shadowed_llm_text(self._llm_advisory_font, category, rl.Vector2(inner_x, cursor_y), category_size, value_color)
+    cursor_y += category_size + 13
 
-    row_y = y + 58
-    value_x = inner_x + label_col_w
-    value_w = max(0, int(x + panel_w - value_x - 22))
-    for label, value_lines, row_height in render_rows:
-      value_font_size = detail_size if label == "DETAIL" else value_size
-      self._draw_shadowed_llm_text(self._llm_advisory_meta_font, label, rl.Vector2(inner_x, row_y + 7), label_size, label_color)
-      for line_index, value_line in enumerate(value_lines):
-        line_y = row_y + line_index * (value_font_size + 4)
-        self._draw_shadowed_llm_text(self._llm_advisory_font, value_line, rl.Vector2(value_x, line_y), value_font_size,
-                                     detail_color if label == "DETAIL" else value_color)
-      row_y += row_height
+    self._draw_shadowed_llm_text(self._llm_advisory_meta_font, "LOCATION", rl.Vector2(inner_x, cursor_y), label_size, label_color)
+    cursor_y += label_size + 4
+    for line in location_lines:
+      self._draw_shadowed_llm_text(self._llm_advisory_font, line, rl.Vector2(inner_x, cursor_y), info_size, value_color)
+      cursor_y += info_size + text_gap
+
+    cursor_y += 4
+    self._draw_shadowed_llm_text(self._llm_advisory_meta_font, "DETAIL", rl.Vector2(inner_x, cursor_y), label_size, label_color)
+    cursor_y += label_size + 4
+    for line in detail_lines:
+      self._draw_shadowed_llm_text(self._llm_advisory_font, line, rl.Vector2(inner_x, cursor_y), detail_size, detail_color)
+      cursor_y += detail_size + text_gap
 
   def _llm_inspection_rows(self, advisory: str) -> list[tuple[str, str]]:
     fields = {}
