@@ -33,6 +33,7 @@ DESCRIPTIONS = {
   ),
   "AlwaysOnDM": tr_noop("Enable driver monitoring even when sunnypilot is not engaged."),
   "LLMAgentEnabled": tr_noop("Enable the LLM Agent road-scene assistant."),
+  "TrafficAdvisorEnabled": tr_noop("Show nearby FL511 traffic advisories on the driving screen when driving in Florida."),
   'RecordFront': tr_noop("Upload data from the driver facing camera and help improve the driver monitoring algorithm."),
   "IsMetric": tr_noop("Display speed in km/h instead of mph."),
   "RecordAudio": tr_noop("Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect."),
@@ -81,6 +82,12 @@ class TogglesLayout(Widget):
         lambda: tr("Enable LLM Agent"),
         DESCRIPTIONS["LLMAgentEnabled"],
         "experimental_white.png",
+        False,
+      ),
+      "TrafficAdvisorEnabled": (
+        lambda: tr("Enable Traffic Advisor"),
+        DESCRIPTIONS["TrafficAdvisorEnabled"],
+        "warning.png",
         False,
       ),
       "RecordFront": (

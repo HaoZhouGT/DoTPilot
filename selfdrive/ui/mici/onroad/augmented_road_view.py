@@ -11,10 +11,12 @@ from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
+from openpilot.selfdrive.ui.mici.onroad.road_inspection_overlay import RoadInspectionOverlay
+from openpilot.selfdrive.ui.mici.onroad.traffic_advisory_overlay import TrafficAdvisoryOverlay
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, MouseEvent
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets import Widget
-from openpilot.common.filter_simple import BounceFilter, FirstOrderFilter
+from openpilot.common.filter_simple import BounceFilter
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
 from enum import IntEnum
@@ -163,13 +165,14 @@ class AugmentedRoadView(CameraView):
     self._alert_renderer = AlertRenderer()
     self._driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall()
+    self._road_inspection_overlay = RoadInspectionOverlay()
+    self._traffic_advisory_overlay = TrafficAdvisoryOverlay()
     self._offroad_label = UnifiedLabel("start the car to\nuse sunnypilot", 54, FontWeight.DISPLAY,
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                        alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
 
     self._fade_texture = gui_app.texture("icons_mici/onroad/onroad_fade.png")
-    self._fade_alpha_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
 
     # debug
     self._pm = messaging.PubMaster(['uiDebug'])
@@ -222,11 +225,8 @@ class AugmentedRoadView(CameraView):
     # Draw all UI overlays
     self._model_renderer.render(self._content_rect)
 
-    # Fade out bottom of overlays for looks (only when engaged)
-    fade_alpha = self._fade_alpha_filter.update(ui_state.status != UIStatus.DISENGAGED)
-    if fade_alpha > 1e-2:
-      rl.draw_texture_ex(self._fade_texture, rl.Vector2(self._content_rect.x, self._content_rect.y), 0.0, 1.0,
-                         rl.Color(255, 255, 255, int(255 * fade_alpha)))
+    # Fade out bottom of overlays for looks
+    rl.draw_texture_ex(self._fade_texture, rl.Vector2(self._content_rect.x, self._content_rect.y), 0.0, 1.0, rl.WHITE)
 
     alert_to_render, not_animating_out = self._alert_renderer.will_render()
 
@@ -243,6 +243,11 @@ class AugmentedRoadView(CameraView):
     # TODO: have alert renderer draw offroad mici label below
     if ui_state.started:
       self._alert_renderer.render(self._content_rect)
+
+    if ui_state.started and alert_to_render is None:
+      self._road_inspection_overlay.render(self._content_rect)
+      self._traffic_advisory_overlay.render(self._content_rect)
+
     self._hud_renderer.render(self._content_rect)
 
     # Draw fake rounded border

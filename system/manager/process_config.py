@@ -72,6 +72,10 @@ def llm_agent_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
   # Allow offroad testing when explicitly enabled.
   return params.get_bool("LLMAgentEnabled")
 
+def traffic_advisor_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
+  # The advisor self-gates on valid Florida GPS before it does network work.
+  return params.get_bool("TrafficAdvisorEnabled")
+
 def sunnylink_ready_shim(started, params, CP: car.CarParams) -> bool:
   """Shim for sunnylink_ready to match the process manager signature."""
   return sunnylink_ready(params)
@@ -192,6 +196,7 @@ procs += [
 
   # llm-agent
   PythonProcess("llm-agent", "sunnypilot.llm_agent.llm_agent", llm_agent_enabled),
+  PythonProcess("traffic-advisor", "sunnypilot.traffic_advisor.traffic_advisor", traffic_advisor_enabled),
 
   # locationd
   NativeProcess("locationd_llk", "sunnypilot/selfdrive/locationd", ["./locationd"], only_onroad),

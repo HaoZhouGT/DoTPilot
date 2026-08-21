@@ -628,6 +628,18 @@
     "title": "Enable LLM Agent",
     "description": ""
   },
+  "LLMRoadInspection": {
+    "title": "LLM Road Inspection",
+    "description": "Latest road-scene inspection result selected for the on-road display."
+  },
+  "TrafficAdvisory": {
+    "title": "Traffic Advisory",
+    "description": "Latest nearby FL511 traffic advisory selected for the on-road display."
+  },
+  "TrafficAdvisorEnabled": {
+    "title": "Enable Traffic Advisor",
+    "description": "Show nearby FL511 incidents, closures, construction, congestion, weather, and message-sign advisories on the driving screen while in Florida."
+  },
   "LiveDelay": {
     "title": "Live Delay",
     "description": ""
