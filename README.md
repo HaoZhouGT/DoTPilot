@@ -1,7 +1,44 @@
-![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
+# DoTPilot v2x-traffic-advisor-f511 Branch
 
-## 🌞 What is sunnypilot?
-[sunnypilot](https://github.com/sunnyhaibin/sunnypilot) is a fork of comma.ai's openpilot, an open source driver assistance system. sunnypilot offers the user a unique driving experience for over 300+ supported car makes and models with modified behaviors of driving assist engagements. sunnypilot complies with comma.ai's safety rules as accurately as possible.
+This branch combines DoTPilot road inspection with Florida 511 traffic advisories for in-vehicle warnings. It builds on sunnypilot/openpilot and focuses on agency workflows where fleet vehicles both observe roadway conditions and receive agency context back in the cockpit.
+
+All added intelligence is advisory. The LLM and traffic-advisory processes publish UI findings and warnings, but they do not directly control steering, throttle, or brakes.
+
+## Branch Focus
+
+| Area | Implementation | Current output |
+| --- | --- | --- |
+| Road inspection | `sunnypilot/llm_agent/llm_agent.py` | `LLMRoadInspection` JSON for the onroad road-inspection overlay. |
+| Traffic advisories | `sunnypilot/traffic_advisor/traffic_advisor.py` | `TrafficAdvisory` JSON for the FL511 onroad overlay. |
+| Fleet log export | `system/loggerd/dropbox_uploader.py` | Wi-Fi-only route uploads plus `DropboxUploadPendingCount`. |
+
+## Road Inspection
+
+Enable the road inspection agent with `LLMAgentEnabled` and `AgentApiKey`. This branch publishes structured `LLMRoadInspection` JSON, uses `gpt-4o-mini` by default, keeps runtime logs under `/data/llm-agent-test/`, and renders findings such as pavement defects, standing water, debris, shoulder damage, lane-marking problems, sign/signal issues, guardrail damage, bridge concerns, and work zones.
+
+```bash
+echo -n "1" > /data/params/d/LLMAgentEnabled
+echo -n "sk-..." > /data/params/d/AgentApiKey
+```
+
+## FL511 Traffic Advisor
+
+Enable the traffic advisor with `TrafficAdvisorEnabled`. The `traffic-advisor` process fetches public FL511 map layers, filters them on-device by valid Florida GPS, heading, current road, distance, route corridor, severity, and event type, then publishes the selected event to `TrafficAdvisory` for the onroad overlay.
+
+```bash
+echo -n "1" > /data/params/d/TrafficAdvisorEnabled
+```
+
+Supported event groups include closures, incidents, construction, congestion, disabled vehicles, road conditions, weather, special events, and message signs.
+
+## Dropbox Fleet Log Export
+
+Enable the optional Dropbox uploader with `EnableDropboxUploader`. Configure either `DropboxAccessToken` or the refresh-token trio `DropboxRefreshToken`, `DropboxAppKey`, and `DropboxAppSecret`. Route files upload only on Wi-Fi, are grouped as `<route>/<segment>/<file>`, and pending work is reported through `DropboxUploadPendingCount`.
+
+```bash
+echo -n "1" > /data/params/d/EnableDropboxUploader
+echo -n "/DoTPilotDrives" > /data/params/d/DropboxUploadFolder
+```
 
 ## 💭 Join our Community Forum
 Join the official sunnypilot community forum to stay up to date with all the latest features and be a part of shaping the future of sunnypilot!
@@ -22,6 +59,8 @@ We welcome both pull requests and issues on GitHub. Bug fixes are encouraged.
 Pull requests should be against the most current `master` branch.
 
 ## 📊 User Data
+
+When enabled, road inspection sends forward-camera images to the configured OpenAI backend. The FL511 advisor fetches public event/map data and filters it locally. Dropbox export uploads route logs to the configured Dropbox account. Base sunnypilot/comma logging behavior still applies.
 
 By default, sunnypilot uploads the driving data to comma servers. You can also access your data through [comma connect](https://connect.comma.ai/).
 
