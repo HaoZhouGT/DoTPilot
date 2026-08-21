@@ -97,11 +97,9 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     self.model_renderer.render(self._content_rect)
     AugmentedRoadViewSP.update_fade_out_bottom_overlay(self, self._content_rect)
     self._hud_renderer.render(self._content_rect)
-    has_alert = self.alert_renderer.get_alert(ui_state.sm) is not None
     self.alert_renderer.render(self._content_rect)
     self.driver_state_renderer.render(self._content_rect)
-    if not has_alert:
-      self._road_inspection_overlay.render(self._content_rect)
+    self._road_inspection_overlay.render(self._content_rect)
 
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds
