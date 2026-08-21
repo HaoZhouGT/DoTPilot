@@ -140,9 +140,7 @@ class UIState(UIStateSP):
     elif not self.sm.alive["wideRoadCameraState"] or not self.sm.valid["wideRoadCameraState"]:
       self.light_sensor = -1
 
-    # Test override: allow onroad UI without ignition while keeping manager offroad.
-    force_onroad_mode = self.params.get_bool("ForceOnroadMode")
-    self.started = (self.sm["deviceState"].started and self.ignition) or force_onroad_mode
+    self.started = self.sm["deviceState"].started and self.ignition
 
     # Update recording audio state
     self.recording_audio = self.params.get_bool("RecordAudio") and self.started

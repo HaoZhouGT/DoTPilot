@@ -342,10 +342,6 @@
     "title": "Firmware Query Done",
     "description": ""
   },
-  "ForceOnroadMode": {
-    "title": "Force Onroad UI (Test)",
-    "description": "For testing only: shows the onroad camera UI without ignition, but does not start driving controls."
-  },
   "ForcePowerDown": {
     "title": "Force Power Down",
     "description": ""
