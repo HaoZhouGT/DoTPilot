@@ -103,7 +103,6 @@ class TogglesLayoutMici(NavWidget):
 
     if not ui_state.params.get_bool("LLMAgentEnabled"):
       ui_state.params.remove("LLMAgentAdvisory")
-      ui_state.params.remove("LLMRoadInspection")
 
     audio_ready = ui_state.params.get_bool("LLMAgentEnabled") and ui_state.params.get_bool("LLMAgentAudioEnabled")
     self._llm_audio_trigger_btn.set_enabled(audio_ready)

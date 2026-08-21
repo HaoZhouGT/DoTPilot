@@ -176,7 +176,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LeadDepartAlert", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"LLMAgentEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"LLMAgentAdvisory", {PERSISTENT, STRING}},
-    {"LLMRoadInspection", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION, JSON}},
     {"LLMAgentAudioEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"LLMAgentAudioTrigger", {CLEAR_ON_MANAGER_START, BOOL}},
     {"MaxTimeOffroad", {PERSISTENT | BACKUP, INT, "1800"}},
