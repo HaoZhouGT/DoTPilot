@@ -64,8 +64,9 @@ VISION_USER_PROMPT = (
   "context. "
   "Return exactly one short sentence. If a visible road asset issue exists, start with one label "
   "from PAVEMENT, FLOODING, DEBRIS, SIGN_SIGNAL, GUARDRAIL, SHOULDER, LANE_MARKING, DRAINAGE, "
-  "BRIDGE, WORK_ZONE, OTHER_ASSET, then describe the issue and where it appears. Report likely "
-  "maintenance issues even if they are not severe. Prioritize storm damage, standing water, gutter "
+  "BRIDGE, WORK_ZONE, OTHER_ASSET, then describe the issue and where it appears. Include the "
+  "asset location in plain words such as left shoulder, right curb, center lane, near field, "
+  "mid field, or far field. Report likely maintenance issues even if they are not severe. Prioritize storm damage, standing water, gutter "
   "or curb ponding, washouts, blocked drains, downed trees or power lines, damaged signs or signals, "
   "missing or leaning barriers, potholes, pavement patches, cracking, edge drop-offs, faded or "
   "blocked lane markings, shoulder erosion, and debris. If the road/assets appear normal or the "
@@ -208,8 +209,8 @@ def _openai_vision_describe(api_key: str, image_payloads: tuple[tuple[str, int, 
   choice = body.get("choices", [{}])[0]
   content = choice.get("message", {}).get("content", "")
   content = str(content).strip().replace("\n", " ")
-  if len(content) > 80:
-    content = content[:80]
+  if len(content) > 140:
+    content = content[:140]
   if not content:
     finish_reason = choice.get("finish_reason", "unknown")
     return False, f"empty response ({finish_reason})"
@@ -239,31 +240,76 @@ def _to_short_advisory(summary: str) -> str:
     for k in ("no asset issue", "no road asset issue", "no agency-actionable", "no clear issue")
   ):
     return ""
+
+  def _detail_text() -> str:
+    detail = summary.split(":", 1)[1] if ":" in summary else summary
+    detail = " ".join(detail.strip(" .:-").split())
+    if not detail:
+      return "agency-actionable asset condition visible"
+    return detail[:72]
+
+  def _location_text() -> str:
+    distance = ""
+    if any(k in normalized for k in ("near field", "foreground", "close", "near")):
+      distance = "near field"
+    elif any(k in normalized for k in ("mid field", "middle distance", "mid")):
+      distance = "mid field"
+    elif any(k in normalized for k in ("far field", "distant", "far ahead", "far")):
+      distance = "far field"
+
+    side = ""
+    if "left" in normalized:
+      side = "left"
+    elif "right" in normalized:
+      side = "right"
+    elif any(k in normalized for k in ("center", "centre", "middle")):
+      side = "center"
+
+    feature = "roadway"
+    if any(k in normalized for k in ("shoulder", "edge drop", "drop-off")):
+      feature = "shoulder"
+    elif any(k in normalized for k in ("curb", "gutter")):
+      feature = "curb/gutter"
+    elif any(k in normalized for k in ("drain", "ditch", "inlet", "culvert")):
+      feature = "drainage"
+    elif any(k in normalized for k in ("lane", "travel lane")):
+      feature = "travel lane"
+    elif any(k in normalized for k in ("marking", "striping")):
+      feature = "lane marking"
+    elif "sidewalk" in normalized:
+      feature = "sidewalk"
+
+    parts = [p for p in (distance, side, feature) if p]
+    return ", ".join(parts) if parts else "roadway"
+
+  def _format_advisory(category: str) -> str:
+    return f"CATEGORY={category}; LOCATION={_location_text()}; DETAIL={_detail_text()}"
+
   if label in label_advisories:
-    return label_advisories[label]
+    return _format_advisory(label_advisories[label])
   if any(k in normalized for k in ("flood", "standing water", "ponding", "high water")):
-    return "Flooding"
+    return _format_advisory("Flooding")
   if any(k in normalized for k in ("debris", "downed tree", "fallen tree", "power line", "object in road")):
-    return "Debris in roadway"
+    return _format_advisory("Debris in roadway")
   if any(k in normalized for k in ("drain", "culvert", "inlet", "blocked grate")):
-    return "Drainage issue"
+    return _format_advisory("Drainage issue")
   if any(k in normalized for k in ("sign", "signal", "traffic light", "mast arm")):
-    return "Sign/signal damage"
+    return _format_advisory("Sign/signal damage")
   if any(k in normalized for k in ("guardrail", "barrier", "crash attenuator")):
-    return "Barrier damage"
+    return _format_advisory("Barrier damage")
   if any(k in normalized for k in ("lane marking", "striping", "faded marking", "blocked marking")):
-    return "Marking issue"
+    return _format_advisory("Marking issue")
   if any(k in normalized for k in ("shoulder", "edge drop", "drop-off", "erosion")):
-    return "Shoulder issue"
+    return _format_advisory("Shoulder issue")
   if any(k in normalized for k in ("bridge", "overpass", "approach slab")):
-    return "Bridge issue"
+    return _format_advisory("Bridge issue")
   if any(k in normalized for k in ("work zone", "cone", "barrel", "barricade")):
-    return "Work zone issue"
+    return _format_advisory("Work zone issue")
   if any(
     k in normalized
     for k in ("pavement", "pothole", "crack", "washout", "sinkhole", "rutting", "rough road", "broken road")
   ):
-    return "Pavement issue"
+    return _format_advisory("Pavement issue")
   return ""
 
 

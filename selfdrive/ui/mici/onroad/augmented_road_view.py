@@ -168,6 +168,7 @@ class AugmentedRoadView(CameraView):
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                        alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
     self._llm_advisory_font = gui_app.font(FontWeight.BOLD)
+    self._llm_advisory_meta_font = gui_app.font(FontWeight.MEDIUM)
 
     self._fade_texture = gui_app.texture("icons_mici/onroad/onroad_fade.png")
     self._fade_alpha_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
@@ -278,27 +279,94 @@ class AugmentedRoadView(CameraView):
     if not advisory:
       return
 
-    max_len = 72
-    if len(advisory) > max_len:
-      advisory = advisory[:max_len - 3].rstrip() + "..."
-
-    font_size = 34
-    x = rect.x + 24
-    y = rect.y + 72
-    max_width = rect.x + rect.width - x - 24
-    while advisory and rl.measure_text_ex(self._llm_advisory_font, advisory, font_size, 0).x > max_width:
-      if len(advisory) <= 3:
-        advisory = ""
-        break
-      advisory = advisory[:-4].rstrip() + "..."
-    if not advisory:
+    rows = self._llm_inspection_rows(advisory)
+    if not rows:
       return
 
-    pos = rl.Vector2(x, y)
-    for dx, dy in ((2, 2), (1, 1)):
-      rl.draw_text_ex(self._llm_advisory_font, advisory, rl.Vector2(pos.x + dx, pos.y + dy), font_size, 0,
-                      rl.Color(0, 0, 0, 190))
-    rl.draw_text_ex(self._llm_advisory_font, advisory, pos, font_size, 0, rl.Color(255, 235, 235, 235))
+    panel_w = min(740, max(420, int(rect.width * 0.58)))
+    panel_w = min(panel_w, int(rect.width - 64))
+    if panel_w <= 0:
+      return
+
+    header_size = 28
+    label_size = 21
+    value_size = 34
+    detail_size = 27
+    row_h = 44
+    panel_h = 70 + row_h * len(rows) + 16
+    x = rect.x + (rect.width - panel_w) / 2
+    y = rect.y + (rect.height - panel_h) * 0.42
+    panel = rl.Rectangle(x, y, panel_w, panel_h)
+
+    bg = rl.Color(6, 12, 16, 212)
+    border = rl.Color(255, 186, 55, 230)
+    accent = rl.Color(255, 205, 68, 245)
+    label_color = rl.Color(143, 218, 235, 235)
+    value_color = rl.Color(255, 255, 245, 245)
+    detail_color = rl.Color(232, 240, 244, 235)
+
+    rl.draw_rectangle_rounded(panel, 0.08, 8, bg)
+    rl.draw_rectangle_rounded_lines_ex(panel, 0.08, 8, 3, border)
+    rl.draw_rectangle(int(x + 14), int(y + 16), 7, int(panel_h - 32), accent)
+
+    inner_x = x + 34
+    self._draw_shadowed_llm_text(self._llm_advisory_font, "ROAD INSPECTION FINDING",
+                                 rl.Vector2(inner_x, y + 15), header_size, accent)
+
+    row_y = y + 58
+    label_col_w = min(164, panel_w * 0.30)
+    value_x = inner_x + label_col_w
+    value_w = max(0, int(x + panel_w - value_x - 22))
+    for label, value in rows:
+      value_font_size = detail_size if label == "DETAIL" else value_size
+      value = self._fit_llm_text(self._llm_advisory_font, value, value_font_size, value_w)
+      self._draw_shadowed_llm_text(self._llm_advisory_meta_font, label, rl.Vector2(inner_x, row_y + 7), label_size, label_color)
+      self._draw_shadowed_llm_text(self._llm_advisory_font, value, rl.Vector2(value_x, row_y), value_font_size,
+                                   detail_color if label == "DETAIL" else value_color)
+      row_y += row_h
+
+  def _llm_inspection_rows(self, advisory: str) -> list[tuple[str, str]]:
+    fields = {}
+    for part in advisory.split(";"):
+      if "=" not in part:
+        continue
+      key, value = part.split("=", 1)
+      key = key.strip().upper()
+      value = " ".join(value.strip().split())
+      if key and value:
+        fields[key] = value
+
+    if not fields:
+      category = " ".join(advisory.strip().split())[:56]
+      fields = {
+        "CATEGORY": category,
+        "LOCATION": "roadway",
+        "DETAIL": "field verification recommended",
+      }
+
+    rows = [
+      ("CATEGORY", fields.get("CATEGORY", "Road asset issue")),
+      ("LOCATION", fields.get("LOCATION", "roadway")),
+      ("DETAIL", fields.get("DETAIL", fields.get("ACTION", "field verification recommended"))),
+    ]
+    return [(label, value) for label, value in rows if value]
+
+  def _fit_llm_text(self, font: rl.Font, text: str, font_size: int, max_width: int) -> str:
+    text = " ".join(text.replace("\n", " ").split())
+    if max_width <= 0:
+      return ""
+    if rl.measure_text_ex(font, text, font_size, 0).x <= max_width:
+      return text
+    while len(text) > 3 and rl.measure_text_ex(font, text + "...", font_size, 0).x > max_width:
+      text = text[:-1].rstrip()
+    return f"{text}..." if text else ""
+
+  def _draw_shadowed_llm_text(self, font: rl.Font, text: str, pos: rl.Vector2, font_size: int, color: rl.Color) -> None:
+    if not text:
+      return
+    shadow = rl.Color(0, 0, 0, 205)
+    rl.draw_text_ex(font, text, rl.Vector2(pos.x + 2, pos.y + 2), font_size, 0, shadow)
+    rl.draw_text_ex(font, text, pos, font_size, 0, color)
 
   def _switch_stream_if_needed(self, sm):
     if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:

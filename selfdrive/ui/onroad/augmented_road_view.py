@@ -124,27 +124,94 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     if not advisory:
       return
 
-    max_len = 72
-    if len(advisory) > max_len:
-      advisory = advisory[:max_len - 3].rstrip() + "..."
-
-    font_size = 34
-    x = rect.x + (280 if rect.width > 1100 else 24)
-    y = rect.y + 72
-    max_width = rect.x + rect.width - x - 24
-    while advisory and rl.measure_text_ex(self._font_bold, advisory, font_size, 0).x > max_width:
-      if len(advisory) <= 3:
-        advisory = ""
-        break
-      advisory = advisory[:-4].rstrip() + "..."
-    if not advisory:
+    rows = self._llm_inspection_rows(advisory)
+    if not rows:
       return
 
-    pos = rl.Vector2(x, y)
-    for dx, dy in ((2, 2), (1, 1)):
-      rl.draw_text_ex(self._font_bold, advisory, rl.Vector2(pos.x + dx, pos.y + dy), font_size, 0,
-                      rl.Color(0, 0, 0, 190))
-    rl.draw_text_ex(self._font_bold, advisory, pos, font_size, 0, rl.Color(255, 235, 235, 235))
+    panel_w = min(760, max(420, int(rect.width * 0.54)))
+    panel_w = min(panel_w, int(rect.width - 72))
+    if panel_w <= 0:
+      return
+
+    header_size = 30
+    label_size = 23
+    value_size = 36
+    detail_size = 29
+    row_h = 47
+    panel_h = 74 + row_h * len(rows) + 18
+    x = rect.x + (rect.width - panel_w) / 2
+    y = rect.y + (rect.height - panel_h) * 0.42
+    panel = rl.Rectangle(x, y, panel_w, panel_h)
+
+    bg = rl.Color(6, 12, 16, 212)
+    border = rl.Color(255, 186, 55, 230)
+    accent = rl.Color(255, 205, 68, 245)
+    label_color = rl.Color(143, 218, 235, 235)
+    value_color = rl.Color(255, 255, 245, 245)
+    detail_color = rl.Color(232, 240, 244, 235)
+
+    rl.draw_rectangle_rounded(panel, 0.08, 8, bg)
+    rl.draw_rectangle_rounded_lines_ex(panel, 0.08, 8, 3, border)
+    rl.draw_rectangle(int(x + 14), int(y + 16), 7, int(panel_h - 32), accent)
+
+    inner_x = x + 36
+    self._draw_shadowed_llm_text(self._font_bold, "ROAD INSPECTION FINDING",
+                                 rl.Vector2(inner_x, y + 16), header_size, accent)
+
+    row_y = y + 60
+    label_col_w = min(174, panel_w * 0.30)
+    value_x = inner_x + label_col_w
+    value_w = max(0, int(x + panel_w - value_x - 24))
+    for label, value in rows:
+      value_font_size = detail_size if label == "DETAIL" else value_size
+      value = self._fit_llm_text(self._font_bold, value, value_font_size, value_w)
+      self._draw_shadowed_llm_text(self._font_medium, label, rl.Vector2(inner_x, row_y + 7), label_size, label_color)
+      self._draw_shadowed_llm_text(self._font_bold, value, rl.Vector2(value_x, row_y), value_font_size,
+                                   detail_color if label == "DETAIL" else value_color)
+      row_y += row_h
+
+  def _llm_inspection_rows(self, advisory: str) -> list[tuple[str, str]]:
+    fields = {}
+    for part in advisory.split(";"):
+      if "=" not in part:
+        continue
+      key, value = part.split("=", 1)
+      key = key.strip().upper()
+      value = " ".join(value.strip().split())
+      if key and value:
+        fields[key] = value
+
+    if not fields:
+      category = " ".join(advisory.strip().split())[:56]
+      fields = {
+        "CATEGORY": category,
+        "LOCATION": "roadway",
+        "DETAIL": "field verification recommended",
+      }
+
+    rows = [
+      ("CATEGORY", fields.get("CATEGORY", "Road asset issue")),
+      ("LOCATION", fields.get("LOCATION", "roadway")),
+      ("DETAIL", fields.get("DETAIL", fields.get("ACTION", "field verification recommended"))),
+    ]
+    return [(label, value) for label, value in rows if value]
+
+  def _fit_llm_text(self, font: rl.Font, text: str, font_size: int, max_width: int) -> str:
+    text = " ".join(text.replace("\n", " ").split())
+    if max_width <= 0:
+      return ""
+    if rl.measure_text_ex(font, text, font_size, 0).x <= max_width:
+      return text
+    while len(text) > 3 and rl.measure_text_ex(font, text + "...", font_size, 0).x > max_width:
+      text = text[:-1].rstrip()
+    return f"{text}..." if text else ""
+
+  def _draw_shadowed_llm_text(self, font: rl.Font, text: str, pos: rl.Vector2, font_size: int, color: rl.Color) -> None:
+    if not text:
+      return
+    shadow = rl.Color(0, 0, 0, 205)
+    rl.draw_text_ex(font, text, rl.Vector2(pos.x + 2, pos.y + 2), font_size, 0, shadow)
+    rl.draw_text_ex(font, text, pos, font_size, 0, color)
 
   def _handle_mouse_press(self, _):
     if not self._hud_renderer.user_interacting() and self._click_callback is not None:
