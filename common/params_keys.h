@@ -41,7 +41,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"ExperimentalMode", {PERSISTENT | BACKUP, BOOL}},
     {"ExperimentalModeConfirmed", {PERSISTENT | BACKUP, BOOL}},
     {"FirmwareQueryDone", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION, BOOL}},
-    {"ForceOnroadMode", {PERSISTENT | BACKUP, BOOL}},
+    // Deprecated test param; keep as a tombstone so old persistent values are cleared on deployed devices.
+    {"ForceOnroadMode", {CLEAR_ON_MANAGER_START, BOOL}},
     {"ForcePowerDown", {PERSISTENT, BOOL}},
     {"GitBranch", {PERSISTENT, STRING}},
     {"GitCommit", {PERSISTENT, STRING}},
