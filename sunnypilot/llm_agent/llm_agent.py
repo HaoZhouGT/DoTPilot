@@ -17,14 +17,23 @@ from openpilot.common.realtime import Ratekeeper
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.camerad.snapshot import extract_image
 
+
+def _env_float(name: str, default: float) -> float:
+  try:
+    return float(os.getenv(name, str(default)))
+  except ValueError:
+    return default
+
+
 OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions"
 OPENAI_MODEL = os.getenv("LLM_AGENT_VISION_MODEL", "gpt-4o")
 OPENAI_AUDIO_MODEL = "gpt-4o-mini-transcribe"
 OPENAI_TIMEOUT_S = 25
-OPENAI_PING_INTERVAL_S = 10
+OPENAI_PING_INTERVAL_S = _env_float("LLM_AGENT_VISION_INTERVAL_S", 5)
 OPENAI_AUDIO_TIMEOUT_S = 20
 OPENAI_MAX_COMPLETION_TOKENS = 256
+ADVISORY_HOLD_S = _env_float("LLM_AGENT_ADVISORY_HOLD_S", 25)
 JPEG_MAX_SIZE = (960, 540)
 JPEG_QUALITY = 70
 LOCAL_LOG_PATH = "/data/llm-agent-test/llm_agent_runtime.log"
@@ -36,17 +45,20 @@ AUDIO_CAPTURE_SECONDS = 2.0
 AUDIO_CAPTURE_TIMEOUT_S = 8.0
 VISION_SYSTEM_PROMPT = (
   "You are a transportation agency road asset inspector reviewing a forward-facing vehicle image. "
-  "Focus on maintenance and post-hurricane windshield-survey issues. Report only visible, "
-  "agency-actionable roadway asset conditions. Do not invent hazards; ignore normal traffic unless "
-  "it directly blocks inspection or involves road asset damage."
+  "Focus on routine maintenance and post-hurricane windshield-survey issues. Favor recall for "
+  "visible maintenance concerns that a DOT crew should review, including minor or early-stage "
+  "defects near the travel lane, shoulder, curb, or drainage path. Do not invent hazards; ignore "
+  "normal traffic unless it directly blocks inspection or involves road asset damage."
 )
 VISION_USER_PROMPT = (
   "Return exactly one short sentence. If a visible road asset issue exists, start with one label "
   "from PAVEMENT, FLOODING, DEBRIS, SIGN_SIGNAL, GUARDRAIL, SHOULDER, LANE_MARKING, DRAINAGE, "
-  "BRIDGE, WORK_ZONE, OTHER_ASSET, then describe the issue and where it appears. Prioritize storm "
-  "damage, standing water, washouts, blocked drains, downed trees or power lines, damaged signs or "
-  "signals, missing or leaning barriers, potholes, cracking, edge drop-offs, faded or blocked lane "
-  "markings, shoulder erosion, and debris. If no clear issue is visible, return "
+  "BRIDGE, WORK_ZONE, OTHER_ASSET, then describe the issue and where it appears. Report likely "
+  "maintenance issues even if they are not severe. Prioritize storm damage, standing water, gutter "
+  "or curb ponding, washouts, blocked drains, downed trees or power lines, damaged signs or signals, "
+  "missing or leaning barriers, potholes, pavement patches, cracking, edge drop-offs, faded or "
+  "blocked lane markings, shoulder erosion, and debris. If the road/assets appear normal or the "
+  "image is too unclear to inspect, return "
   "'NO_ASSET_ISSUE: no agency-actionable road asset issue visible.'"
 )
 
@@ -219,6 +231,19 @@ def _to_short_advisory(summary: str) -> str:
   return ""
 
 
+def _update_advisory(params: Params, advisory: str, active_advisory: str, advisory_expiry: float, now: float) -> tuple[str, float]:
+  if advisory:
+    params.put(ADVISORY_PARAM, advisory)
+    return advisory, now + ADVISORY_HOLD_S
+
+  if active_advisory and now < advisory_expiry:
+    params.put(ADVISORY_PARAM, active_advisory)
+    return active_advisory, advisory_expiry
+
+  params.put(ADVISORY_PARAM, "")
+  return "", 0.0
+
+
 def _capture_audio_prompt_wav(sm_audio: messaging.SubMaster) -> bytes | None:
   pcm = bytearray()
   sample_rate = 16000
@@ -295,6 +320,8 @@ def main():
   last_heartbeat = 0.0
   last_ping = 0.0
   warned_no_key = False
+  active_advisory = ""
+  advisory_expiry = 0.0
 
   while True:
     sm.update(0)
@@ -352,31 +379,43 @@ def main():
           _log_local(f"vision attempt networkType={network_type} routeIface={route_iface}")
           image_payload = _capture_front_camera_jpeg_b64()
           if not image_payload:
-            params.put(ADVISORY_PARAM, "")
+            active_advisory, advisory_expiry = _update_advisory(
+              params, "", active_advisory, advisory_expiry, now
+            )
             cloudlog.warning("llm-agent: no front camera frame available from camerad")
             _log_local("no front camera frame available from camerad")
-            _log_local("ui advisory: cleared")
+            _log_local(f"ui advisory: {active_advisory or 'cleared'}")
           else:
             image_b64, image_size, capture_path = image_payload
             cloudlog.info(f"llm-agent: encoded frame size={image_size}B")
             _log_local(f"encoded frame size={image_size}B capture={capture_path}")
+            request_start = time.monotonic()
             ok, detail = _openai_vision_describe(api_key, image_b64)
+            request_elapsed = time.monotonic() - request_start
+            response_now = time.monotonic()
+            _log_local(f"vision response model={OPENAI_MODEL} elapsed={request_elapsed:.2f}s ok={ok}")
             if ok:
               advisory = _to_short_advisory(detail)
-              params.put(ADVISORY_PARAM, advisory)
+              active_advisory, advisory_expiry = _update_advisory(
+                params, advisory, active_advisory, advisory_expiry, response_now
+              )
               cloudlog.info(f"llm-agent: road summary: {detail}")
               _log_local(f"road summary: {detail}")
-              _log_local(f"ui advisory: {advisory or 'cleared'}")
+              _log_local(f"ui advisory: {active_advisory or 'cleared'}")
             else:
-              params.put(ADVISORY_PARAM, "")
+              active_advisory, advisory_expiry = _update_advisory(
+                params, "", active_advisory, advisory_expiry, response_now
+              )
               cloudlog.warning(f"llm-agent: OpenAI vision failed ({detail})")
               _log_local(f"OpenAI vision failed ({detail})")
-              _log_local("ui advisory: cleared")
+              _log_local(f"ui advisory: {active_advisory or 'cleared'}")
         except Exception as e:
-          params.put(ADVISORY_PARAM, "")
+          active_advisory, advisory_expiry = _update_advisory(
+            params, "", active_advisory, advisory_expiry, now
+          )
           cloudlog.warning(f"llm-agent: OpenAI request error: {e}")
           _log_local(f"OpenAI request error: {e}")
-          _log_local("ui advisory: cleared")
+          _log_local(f"ui advisory: {active_advisory or 'cleared'}")
       last_ping = now
 
     rk.keep_time()
