@@ -27,6 +27,7 @@ class TogglesLayoutMici(NavWidget):
     record_front = BigParamControl("record & upload driver camera", "RecordFront", toggle_callback=restart_needed_callback)
     record_mic = BigParamControl("record & upload mic audio", "RecordAudio", toggle_callback=restart_needed_callback)
     enable_openpilot = BigParamControl("enable sunnypilot", "OpenpilotEnabledToggle", toggle_callback=restart_needed_callback)
+    force_onroad_mode = BigParamControl("force onroad mode (test)", "ForceOnroadMode")
     llm_audio_trigger_btn = BigButton("trigger llm audio prompt", "tap to capture")
     llm_audio_trigger_btn.set_click_callback(lambda: ui_state.params.put_bool("LLMAgentAudioTrigger", True))
 
@@ -41,6 +42,7 @@ class TogglesLayoutMici(NavWidget):
       record_front,
       record_mic,
       enable_openpilot,
+      force_onroad_mode,
       llm_audio_trigger_btn,
     ], snap_items=False)
 
@@ -55,6 +57,7 @@ class TogglesLayoutMici(NavWidget):
       ("RecordFront", record_front),
       ("RecordAudio", record_mic),
       ("OpenpilotEnabledToggle", enable_openpilot),
+      ("ForceOnroadMode", force_onroad_mode),
     )
     self._llm_audio_trigger_btn = llm_audio_trigger_btn
 
@@ -103,6 +106,7 @@ class TogglesLayoutMici(NavWidget):
 
     if not ui_state.params.get_bool("LLMAgentEnabled"):
       ui_state.params.remove("LLMAgentAdvisory")
+      ui_state.params.remove("LLMRoadInspection")
 
     audio_ready = ui_state.params.get_bool("LLMAgentEnabled") and ui_state.params.get_bool("LLMAgentAudioEnabled")
     self._llm_audio_trigger_btn.set_enabled(audio_ready)

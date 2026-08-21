@@ -38,6 +38,9 @@ DESCRIPTIONS = {
   'RecordFront': tr_noop("Upload data from the driver facing camera and help improve the driver monitoring algorithm."),
   "IsMetric": tr_noop("Display speed in km/h instead of mph."),
   "RecordAudio": tr_noop("Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect."),
+  "ForceOnroadMode": tr_noop(
+    "For testing only. Forces onroad mode without ignition so camera and onroad daemons run."
+  ),
 }
 
 
@@ -102,6 +105,12 @@ class TogglesLayout(Widget):
         DESCRIPTIONS["RecordAudio"],
         "microphone.png",
         True,
+      ),
+      "ForceOnroadMode": (
+        lambda: tr("Force Onroad Mode (Test)"),
+        DESCRIPTIONS["ForceOnroadMode"],
+        "warning.png",
+        False,
       ),
       "IsMetric": (
         lambda: tr("Use Metric System"),
@@ -269,6 +278,7 @@ class TogglesLayout(Widget):
     self._params.put_bool(param, state)
     if param == "LLMAgentEnabled" and not state:
       self._params.remove("LLMAgentAdvisory")
+      self._params.remove("LLMRoadInspection")
     if self._toggle_defs[param][3]:
       self._params.put_bool("OnroadCycleRequested", True)
 

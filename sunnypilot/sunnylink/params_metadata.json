@@ -342,6 +342,10 @@
     "title": "Firmware Query Done",
     "description": ""
   },
+  "ForceOnroadMode": {
+    "title": "Force Onroad Mode (Test)",
+    "description": "For testing only: forces onroad mode without ignition so camera and onroad daemons run."
+  },
   "ForcePowerDown": {
     "title": "Force Power Down",
     "description": ""
@@ -635,6 +639,10 @@
   "LLMAgentAdvisory": {
     "title": "LLM Agent Safety Advisory",
     "description": ""
+  },
+  "LLMRoadInspection": {
+    "title": "LLM Road Inspection",
+    "description": "Structured road asset inspection output from llm-agent."
   },
   "LLMAgentAudioEnabled": {
     "title": "Enable LLM Agent Audio",
