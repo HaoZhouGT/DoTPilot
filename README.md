@@ -1,7 +1,31 @@
-![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
+# DoTPilot codex/force-onroad-llm Branch
 
-## 🌞 What is sunnypilot?
-[sunnypilot](https://github.com/sunnyhaibin/sunnypilot) is a fork of comma.ai's openpilot, an open source driver assistance system. sunnypilot offers the user a unique driving experience for over 300+ supported car makes and models with modified behaviors of driving assist engagements. sunnypilot complies with comma.ai's safety rules as accurately as possible.
+This branch carries the Dropbox uploader work on the force-onroad/LLM development line. It builds on [sunnypilot](https://github.com/sunnyhaibin/sunnypilot), itself a fork of comma.ai's openpilot, and keeps the LLM road-scene assistant available while validating fleet-log export behavior.
+
+The added features are advisory or data-export features. They do not directly control steering, throttle, or brakes.
+
+## Branch Focus
+
+Recent work on this branch includes `EnableDropboxUploader`, static-token and refresh-token Dropbox auth, Wi-Fi-only route uploads, route-grouped remote paths in the form `<route>/<segment>/<file>`, `DropboxUploadPendingCount`, and the `LLMAgentEnabled` plus `AgentApiKey` road-scene assistant carryover.
+
+```bash
+echo -n "1" > /data/params/d/EnableDropboxUploader
+echo -n "sl...." > /data/params/d/DropboxAccessToken
+echo -n "/DoTPilotDrives" > /data/params/d/DropboxUploadFolder
+```
+
+Refresh-token auth is also supported with `DropboxRefreshToken`, `DropboxAppKey`, and `DropboxAppSecret`. The uploader intentionally waits for Wi-Fi before uploading route files.
+
+## llm-agent Carryover
+
+The branch can still run the road-scene assistant:
+
+```bash
+echo -n "1" > /data/params/d/LLMAgentEnabled
+echo -n "sk-..." > /data/params/d/AgentApiKey
+```
+
+Use `llm-agent` for current road-inspection UI work and `v2x-traffic-advisor-f511` for the combined road-inspection plus FL511 advisory workflow.
 
 ## 💭 Join our Community Forum
 Join the official sunnypilot community forum to stay up to date with all the latest features and be a part of shaping the future of sunnypilot!
@@ -22,6 +46,8 @@ We welcome both pull requests and issues on GitHub. Bug fixes are encouraged.
 Pull requests should be against the most current `master` branch.
 
 ## 📊 User Data
+
+Dropbox export uploads route files to the configured Dropbox account. Confirm the agency's retention, access-control, and consent policies before enabling it on fleet devices. The llm-agent carryover can send forward-camera images to the configured OpenAI backend when enabled.
 
 By default, sunnypilot uploads the driving data to comma servers. You can also access your data through [comma connect](https://connect.comma.ai/).
 
