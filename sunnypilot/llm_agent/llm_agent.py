@@ -30,12 +30,19 @@ OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions"
 OPENAI_MODEL = os.getenv("LLM_AGENT_VISION_MODEL", "gpt-4o")
 OPENAI_AUDIO_MODEL = "gpt-4o-mini-transcribe"
 OPENAI_TIMEOUT_S = 25
-OPENAI_PING_INTERVAL_S = _env_float("LLM_AGENT_VISION_INTERVAL_S", 5)
+OPENAI_PING_INTERVAL_S = _env_float("LLM_AGENT_VISION_INTERVAL_S", 3)
 OPENAI_AUDIO_TIMEOUT_S = 20
 OPENAI_MAX_COMPLETION_TOKENS = 256
 ADVISORY_HOLD_S = _env_float("LLM_AGENT_ADVISORY_HOLD_S", 5)
 JPEG_MAX_SIZE = (960, 540)
+ROAD_CROP_SIZE = (960, 540)
+ROAD_CROP_TOP_FRACTION = 0.40
+ROAD_CROP_BOTTOM_FRACTION = 0.98
 JPEG_QUALITY = 70
+try:
+  RESAMPLE_LANCZOS = Image.Resampling.LANCZOS
+except AttributeError:
+  RESAMPLE_LANCZOS = Image.LANCZOS
 LOCAL_LOG_PATH = "/data/llm-agent-test/llm_agent_runtime.log"
 CAPTURE_DIR = "/data/llm-agent-test/captures"
 ADVISORY_PARAM = "LLMAgentAdvisory"
@@ -51,6 +58,10 @@ VISION_SYSTEM_PROMPT = (
   "normal traffic unless it directly blocks inspection or involves road asset damage."
 )
 VISION_USER_PROMPT = (
+  "You will receive two images from the same moment: first the full forward scene, then a lower "
+  "road-surface crop emphasizing pavement, lane markings, shoulders, gutters, curbs, and drainage. "
+  "Use the crop to detect small pavement and roadside asset defects while using the full image for "
+  "context. "
   "Return exactly one short sentence. If a visible road asset issue exists, start with one label "
   "from PAVEMENT, FLOODING, DEBRIS, SIGN_SIGNAL, GUARDRAIL, SHOULDER, LANE_MARKING, DRAINAGE, "
   "BRIDGE, WORK_ZONE, OTHER_ASSET, then describe the issue and where it appears. Report likely "
@@ -95,7 +106,33 @@ def _read_api_key(params: Params) -> str:
   return os.getenv("OPENAI_API_KEY", "").strip()
 
 
-def _capture_front_camera_jpeg_b64() -> tuple[str, int, str] | None:
+def _jpeg_b64(img: Image.Image, capture_path: str, max_size: tuple[int, int] | None = None,
+              exact_size: tuple[int, int] | None = None) -> tuple[str, int, str, tuple[int, int]]:
+  out_img = img.copy()
+  if exact_size is not None:
+    out_img = out_img.resize(exact_size, RESAMPLE_LANCZOS)
+  elif max_size is not None:
+    out_img.thumbnail(max_size)
+
+  with io.BytesIO() as out:
+    out_img.save(out, format="JPEG", quality=JPEG_QUALITY, optimize=True)
+    jpeg_bytes = out.getvalue()
+
+  with open(capture_path, "wb") as f:
+    f.write(jpeg_bytes)
+
+  return base64.b64encode(jpeg_bytes).decode("utf-8"), len(jpeg_bytes), capture_path, out_img.size
+
+
+def _road_surface_crop(img: Image.Image) -> Image.Image:
+  width, height = img.size
+  top = int(height * ROAD_CROP_TOP_FRACTION)
+  bottom = int(height * ROAD_CROP_BOTTOM_FRACTION)
+  bottom = max(top + 1, min(height, bottom))
+  return img.crop((0, top, width, bottom))
+
+
+def _capture_front_camera_jpegs_b64() -> tuple[tuple[str, int, str, tuple[int, int]], tuple[str, int, str, tuple[int, int]]] | None:
   stream = VisionStreamType.VISION_STREAM_ROAD
   available = VisionIpcClient.available_streams("camerad", block=False)
   if stream not in available:
@@ -116,28 +153,30 @@ def _capture_front_camera_jpeg_b64() -> tuple[str, int, str] | None:
       if buf is not None:
         rgb = extract_image(buf)
         img = Image.fromarray(rgb)
-        img.thumbnail(JPEG_MAX_SIZE)
+        road_crop = _road_surface_crop(img)
 
-        with io.BytesIO() as out:
-          img.save(out, format="JPEG", quality=JPEG_QUALITY, optimize=True)
-          jpeg_bytes = out.getvalue()
-          os.makedirs(CAPTURE_DIR, exist_ok=True)
-          stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-          capture_path = os.path.join(CAPTURE_DIR, f"{stamp}.jpg")
-          with open(capture_path, "wb") as f:
-            f.write(jpeg_bytes)
-          return base64.b64encode(jpeg_bytes).decode("utf-8"), len(jpeg_bytes), capture_path
+        os.makedirs(CAPTURE_DIR, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        full_path = os.path.join(CAPTURE_DIR, f"{stamp}_full.jpg")
+        crop_path = os.path.join(CAPTURE_DIR, f"{stamp}_road.jpg")
+        full_payload = _jpeg_b64(img, full_path, max_size=JPEG_MAX_SIZE)
+        crop_payload = _jpeg_b64(road_crop, crop_path, exact_size=ROAD_CROP_SIZE)
+        return full_payload, crop_payload
 
     time.sleep(0.05)
 
   return None
 
 
-def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
+def _openai_vision_describe(api_key: str, image_payloads: tuple[tuple[str, int, str, tuple[int, int]], ...]) -> tuple[bool, str]:
   headers = {
     "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json",
   }
+  content = [{"type": "text", "text": VISION_USER_PROMPT}]
+  for image_b64, _, _, _ in image_payloads:
+    content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}})
+
   payload = {
     "model": OPENAI_MODEL,
     "messages": [
@@ -147,10 +186,7 @@ def _openai_vision_describe(api_key: str, image_b64: str) -> tuple[bool, str]:
       },
       {
         "role": "user",
-        "content": [
-          {"type": "text", "text": VISION_USER_PROMPT},
-          {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
-        ],
+        "content": content,
       },
     ],
     "max_completion_tokens": OPENAI_MAX_COMPLETION_TOKENS,
@@ -377,8 +413,8 @@ def main():
           route_iface = _get_route_iface()
           cloudlog.info(f"llm-agent: vision attempt (networkType={network_type}, routeIface={route_iface})")
           _log_local(f"vision attempt networkType={network_type} routeIface={route_iface}")
-          image_payload = _capture_front_camera_jpeg_b64()
-          if not image_payload:
+          image_payloads = _capture_front_camera_jpegs_b64()
+          if not image_payloads:
             active_advisory, advisory_expiry = _update_advisory(
               params, "", active_advisory, advisory_expiry, now
             )
@@ -386,11 +422,14 @@ def main():
             _log_local("no front camera frame available from camerad")
             _log_local(f"ui advisory: {active_advisory or 'cleared'}")
           else:
-            image_b64, image_size, capture_path = image_payload
-            cloudlog.info(f"llm-agent: encoded frame size={image_size}B")
-            _log_local(f"encoded frame size={image_size}B capture={capture_path}")
+            full_payload, crop_payload = image_payloads
+            _, full_size, full_path, full_dims = full_payload
+            _, crop_size, crop_path, crop_dims = crop_payload
+            cloudlog.info(f"llm-agent: encoded frames full={full_size}B crop={crop_size}B")
+            _log_local(f"encoded frame size={full_size}B dims={full_dims[0]}x{full_dims[1]} capture={full_path}")
+            _log_local(f"encoded road crop size={crop_size}B dims={crop_dims[0]}x{crop_dims[1]} capture={crop_path}")
             request_start = time.monotonic()
-            ok, detail = _openai_vision_describe(api_key, image_b64)
+            ok, detail = _openai_vision_describe(api_key, image_payloads)
             request_elapsed = time.monotonic() - request_start
             response_now = time.monotonic()
             _log_local(f"vision response model={OPENAI_MODEL} elapsed={request_elapsed:.2f}s ok={ok}")
