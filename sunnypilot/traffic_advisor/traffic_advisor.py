@@ -624,7 +624,10 @@ def main() -> None:
         if payload.get("has_advisory"):
           selected = payload.get("selected", {})
           cloudlog.info(f"traffic-advisor: {payload.get('driver_display')} ({selected.get('id')})")
-        _log_local(f"poll ok has_advisory={payload.get('has_advisory')} status={payload.get('status')}")
+        _log_local(
+          f"poll ok has_advisory={payload.get('has_advisory')} "
+          f"display={payload.get('driver_display')} status={payload.get('status')}"
+        )
       except Exception as e:
         cloudlog.warning(f"traffic-advisor: poll failed: {e}")
         _log_local(f"poll failed: {e}")

@@ -10,6 +10,7 @@ from openpilot.selfdrive.ui.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.onroad.cameraview import CameraView
+from openpilot.selfdrive.ui.mici.onroad.traffic_advisory_overlay import TrafficAdvisoryOverlay
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
@@ -56,6 +57,7 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     self._hud_renderer = HudRenderer()
     self.alert_renderer = AlertRenderer()
     self.driver_state_renderer = DriverStateRenderer()
+    self._traffic_advisory_overlay = TrafficAdvisoryOverlay(top_margin=360)
 
     # debug
     self._pm = messaging.PubMaster(['uiDebug'])
@@ -92,10 +94,13 @@ class AugmentedRoadView(CameraView, AugmentedRoadViewSP):
     super()._render(rect)
 
     # Draw all UI overlays
+    alert_to_render = self.alert_renderer.get_alert(ui_state.sm)
     self.model_renderer.render(self._content_rect)
     AugmentedRoadViewSP.update_fade_out_bottom_overlay(self, self._content_rect)
     self._hud_renderer.render(self._content_rect)
     self.alert_renderer.render(self._content_rect)
+    if alert_to_render is None:
+      self._traffic_advisory_overlay.render(self._content_rect)
     self.driver_state_renderer.render(self._content_rect)
 
     # Custom UI extension point - add custom overlays here

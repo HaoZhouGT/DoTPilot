@@ -47,12 +47,13 @@ def _distance_text(distance_m: float) -> str:
 
 
 class TrafficAdvisoryOverlay(Widget):
-  def __init__(self):
+  def __init__(self, top_margin: int = TOP_MARGIN):
     super().__init__()
     self._font_title = gui_app.font(FontWeight.SEMI_BOLD)
     self._font_body = gui_app.font(FontWeight.ROMAN)
     self._font_meta = gui_app.font(FontWeight.MEDIUM)
 
+    self._top_margin = top_margin
     self._record: dict[str, object] | None = None
     self._last_param_check = 0.0
     self._alpha_filter = FirstOrderFilter(0.0, 0.12, 1 / gui_app.target_fps)
@@ -79,7 +80,7 @@ class TrafficAdvisoryOverlay(Widget):
 
     selected = self._selected()
     x = rect.x + LEFT_MARGIN
-    y = rect.y + TOP_MARGIN
+    y = rect.y + self._top_margin
     width = min(MAX_WIDTH, max(0, int(rect.width - LEFT_MARGIN * 2)))
 
     title = _clean_text(self._record.get("driver_display"), 72, "Traffic advisory ahead")
@@ -167,4 +168,3 @@ class TrafficAdvisoryOverlay(Widget):
       else:
         right = mid
     return text[:left - 1] + ellipsis if left > 0 else ellipsis
-
