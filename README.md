@@ -3,6 +3,26 @@
 ## Agency platform: DoTPilot
 **DoTPilot** is the MOTIF lab's open-source in-vehicle platform for **state and county transportation agency fleets**. It runs on vehicles an agency already owns and makes each one a two-way link with the agency: an on-board AI dashcam reports roadway conditions as structured findings, while agency feeds — travel advisories, work zone data, incident reports — are delivered back to the driver as in-vehicle warnings. The post-storm damage inspection pipeline, work zone safety warnings, and traffic incident management all run on it.
 
+## Recent Development Branches
+
+| Branch | Focus | Recent development |
+| --- | --- | --- |
+| `master` | Public DoTPilot overview | Positions DoTPilot as the agency platform and points to the current implementation branches. |
+| `llm-agent` | Road asset inspection | Adds the managed `llm-agent` process, OpenAI vision calls, road-surface crops, onroad maintenance-finding overlays, runtime logs, and optional one-shot audio prompts. |
+| `v2x-traffic-advisor-f511` | FL511 driver advisories | Adds a Florida 511 traffic advisor, route and heading-aware filtering, `TrafficAdvisory` JSON output, and onroad rendering for incidents, closures, construction, weather, congestion, and message signs. |
+| `llm-agent-force-onroad` | Bench and UI testing | Adds Force Onroad Mode for lab testing, audio prompt capture, and an FL511 incidents helper for llm-agent experiments. |
+| `codex/rebase-dropbox` and `codex/force-onroad-llm` | Fleet log export | Add a Wi-Fi-only Dropbox uploader with route-grouped folders and a `DropboxUploadPendingCount` status param. |
+
+## Field Workflows
+
+Road inspection branches use `LLMAgentEnabled` and `AgentApiKey` to start the LLM road-scene assistant. Current implementations inspect forward-camera frames for pavement defects, flooding, blocked drainage, debris, shoulder erosion, faded markings, sign or signal damage, guardrail issues, bridge issues, and work zones.
+
+The `v2x-traffic-advisor-f511` branch adds `TrafficAdvisorEnabled` and `TrafficAdvisory` for FL511 warnings. It fetches public FL511 event/map data and filters it on-device by valid Florida GPS, vehicle heading, current road, and navigation route corridor.
+
+The Dropbox branches add `EnableDropboxUploader`, Dropbox credential params, `DropboxUploadFolder`, and `DropboxUploadPendingCount` for agency fleet log export. Uploads are route-grouped and Wi-Fi only.
+
+All of these features are advisory or data-export features. They do not give an AI model direct control over steering, throttle, or brakes.
+
 ## 💭 Join our Community Forum
 Join the official sunnypilot community forum to stay up to date with all the latest features and be a part of shaping the future of sunnypilot!
 * https://community.sunnypilot.ai/
@@ -22,6 +42,8 @@ We welcome both pull requests and issues on GitHub. Bug fixes are encouraged.
 Pull requests should be against the most current `master` branch.
 
 ## 📊 User Data
+
+DoTPilot development branches can add optional data flows when the relevant feature is enabled: road inspection can send forward-camera JPEGs to the configured OpenAI backend, audio prompt experiments can send a short microphone capture for transcription, Dropbox export can upload route files to the configured Dropbox account, and FL511 traffic advisory filtering fetches public event/map data for on-device filtering.
 
 By default, sunnypilot uploads the driving data to comma servers. You can also access your data through [comma connect](https://connect.comma.ai/).
 
